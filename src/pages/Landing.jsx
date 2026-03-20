@@ -28,7 +28,7 @@ export default function Landing() {
         <div className="flex items-center gap-3">
           <button onClick={toggle} className="text-lg">{isDark ? '☀️' : '🌙'}</button>
           <Link to="/login" className={`text-sm font-semibold ${c.light} hover:${c.text}`}>Sign in</Link>
-          <Link to="/signup" className="px-4 py-2 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 transition-all">
+          <Link to="/onboarding" className="px-4 py-2 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 transition-all">
             Get started
           </Link>
         </div>
@@ -51,7 +51,7 @@ export default function Landing() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <Link to="/signup" className="flex items-center gap-2 px-8 py-4 rounded-2xl bg-green-500 text-white font-bold text-base hover:bg-green-600 transition-all">
+          <Link to="/onboarding" className="flex items-center gap-2 px-8 py-4 rounded-2xl bg-green-500 text-white font-bold text-base hover:bg-green-600 transition-all">
             Create Free Account <ArrowRight size={18}/>
           </Link>
           <Link to="/login" className={`flex items-center gap-2 px-8 py-4 rounded-2xl border font-bold text-base transition-all ${c.border} ${c.light} hover:${c.text}`}>
@@ -101,7 +101,7 @@ export default function Landing() {
       <section className={`px-6 py-16 border-t ${c.border} text-center`}>
         <h2 className={`text-3xl font-extrabold mb-4 ${c.text}`}>Ready to get protected?</h2>
         <p className={`${c.light} mb-8`}>Join Collectica. Work safely. Get paid.</p>
-        <Link to="/signup" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-green-500 text-white font-bold hover:bg-green-600 transition-all">
+        <Link to="/onboarding" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-green-500 text-white font-bold hover:bg-green-600 transition-all">
           Create Free Account <ArrowRight size={18}/>
         </Link>
       </section>

@@ -353,7 +353,7 @@ export default function Onboarding() {
               </div>
               <p className={`text-center text-sm ${c.light}`}>
                 Already have an account?{' '}
-                <Link to="/login" className="text-green-500 font-semibold hover:underline">Sign in</Link>
+                <a href="/login" className="text-green-500 font-semibold hover:underline">Sign in</a>
               </p>
             </div>
           )}

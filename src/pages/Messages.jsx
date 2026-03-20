@@ -4,19 +4,52 @@ import {
   ArrowLeft, Send, Paperclip, Search, Shield, FileText,
   Wallet, AlertTriangle, X, Sparkles, Lock, File,
   ChevronRight, Loader2, Bot, Briefcase, Bell, Plus,
-  CheckCircle, Clock, DollarSign
+  CheckCircle, Clock, DollarSign, ChevronDown, ChevronUp,
+  Circle, AlertCircle, XCircle
 } from 'lucide-react'
 import { useTheme } from '../lib/ThemeContext'
 import { useAuth, ROLES } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 
 const SCAM_WORDS = [
-  'outside the platform', 'pay me directly', 'whatsapp me',
-  'bank transfer directly', 'bypass', 'off platform', 'my personal account',
-  'send to my account', 'pay cash'
+  'outside the platform','pay me directly','whatsapp me',
+  'bank transfer directly','bypass','off platform','my personal account',
+  'send to my account','pay cash'
 ]
-
 const COLLE_TRIGGER = /^colle\b/i
+
+// ── Notification helpers ───────────────────────────────────
+function notifIcon(type) {
+  const icons = {
+    message:    '💬',
+    milestone:  '📋',
+    payment:    '💸',
+    contract:   '📄',
+    dispute:    '⚠️',
+    deposit:    '💳',
+    escrow_release: '✅',
+    system:     '🔔',
+  }
+  return icons[type] || '🔔'
+}
+
+function timeAgo(date) {
+  const diff = Math.floor((Date.now() - new Date(date)) / 1000)
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`
+  return new Date(date).toLocaleDateString()
+}
+
+// ── Milestone status config ────────────────────────────────
+const MS_STATUS = {
+  pending:            { label: 'Pending',    color: 'text-[#888]',     dot: 'bg-[#555]'      },
+  in_progress:        { label: 'In Progress',color: 'text-blue-400',   dot: 'bg-blue-400'    },
+  submitted:          { label: 'Submitted',  color: 'text-orange-500', dot: 'bg-orange-500'  },
+  revision_requested: { label: 'Revision',   color: 'text-red-400',    dot: 'bg-red-400'     },
+  approved:           { label: 'Approved',   color: 'text-green-500',  dot: 'bg-green-500'   },
+  paid:               { label: 'Paid',       color: 'text-green-500',  dot: 'bg-green-500'   },
+}
 
 // ── Message bubble ─────────────────────────────────────────
 function MsgBubble({ msg, isDark, c, myId }) {
@@ -33,11 +66,11 @@ function MsgBubble({ msg, isDark, c, myId }) {
 
   if (msg.type === 'colle') return (
     <div className="flex justify-start my-3 px-2">
-      <div className={`max-w-[85%] rounded-2xl border overflow-hidden border-green-500/20 bg-green-500/5`}>
+      <div className="max-w-[85%] rounded-2xl border overflow-hidden border-green-500/20 bg-green-500/5">
         <div className="flex items-center gap-2 px-4 py-2 border-b border-green-500/20">
           <Bot size={12} className="text-green-500"/>
           <span className="text-xs font-bold text-green-500">Colle AI</span>
-          <span className="text-xs text-green-500/50 ml-auto">Collectica AI</span>
+          <span className="text-xs text-green-500/40 ml-auto">Collectica AI</span>
         </div>
         <div className="px-4 py-3">
           <p className="text-xs leading-relaxed text-green-400 whitespace-pre-wrap">{msg.content}</p>
@@ -59,7 +92,7 @@ function MsgBubble({ msg, isDark, c, myId }) {
         <div className="min-w-0">
           <p className="text-sm font-bold truncate max-w-[140px]">{msg.file_name || 'File'}</p>
           <p className="text-xs opacity-60">
-            {msg.file_size ? `${(msg.file_size / 1024 / 1024).toFixed(1)} MB` : 'Attachment'}
+            {msg.file_size ? `${(msg.file_size/1024/1024).toFixed(1)} MB` : 'Attachment'}
           </p>
         </div>
       </div>
@@ -76,7 +109,191 @@ function MsgBubble({ msg, isDark, c, myId }) {
           {msg.content}
         </div>
         <p className={`text-xs px-1 ${c.muted} ${isMe ? 'text-right' : ''}`}>
-          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {new Date(msg.created_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Contract + Milestone panel ─────────────────────────────
+function ContractPanel({ chatId, isDark, c }) {
+  const [contract, setContract]   = useState(null)
+  const [milestones, setMilestones] = useState([])
+  const [loading, setLoading]     = useState(true)
+
+  useEffect(() => {
+    const fetch = async () => {
+      // Get contract linked to this chat
+      const { data: chatData } = await supabase
+        .from('chats')
+        .select('contract_id')
+        .eq('id', chatId)
+        .single()
+
+      if (chatData?.contract_id) {
+        const { data: ct } = await supabase
+          .from('contracts')
+          .select(`
+            *, 
+            client:users!contracts_client_id_fkey(full_name),
+            freelancer:users!contracts_freelancer_id_fkey(full_name)
+          `)
+          .eq('id', chatData.contract_id)
+          .single()
+
+        if (ct) {
+          setContract(ct)
+          const { data: ms } = await supabase
+            .from('milestones')
+            .select('*')
+            .eq('contract_id', ct.id)
+            .order('order_index', { ascending: true })
+          if (ms) setMilestones(ms)
+        }
+      }
+      setLoading(false)
+    }
+    fetch()
+
+    // Real-time milestone updates
+    const ch = supabase.channel('panel-' + chatId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, fetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, fetch)
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [chatId])
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-8">
+      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+    </div>
+  )
+
+  if (!contract) return (
+    <div className="px-4 py-6 text-center">
+      <div className="text-2xl mb-2">📋</div>
+      <p className={`text-xs font-bold ${c.text}`}>No contract yet</p>
+      <p className={`text-xs ${c.muted} mt-1`}>
+        Type <span className="text-green-500 font-bold">Colle</span> in chat to draft one
+      </p>
+    </div>
+  )
+
+  const CT_STATUS = {
+    draft:              { label: 'Draft',          color: 'text-blue-400'    },
+    pending_signatures: { label: 'Awaiting Sigs',  color: 'text-orange-500'  },
+    active:             { label: 'Active',          color: 'text-green-500'   },
+    completed:          { label: 'Completed',       color: 'text-[#888]'      },
+    disputed:           { label: 'Disputed',        color: 'text-red-500'     },
+  }
+  const cs = CT_STATUS[contract.status] || CT_STATUS.draft
+  const paidMilestones = milestones.filter(m => m.status === 'paid' || m.status === 'approved').length
+  const progress = milestones.length > 0 ? Math.round((paidMilestones / milestones.length) * 100) : 0
+
+  return (
+    <div className="px-4 py-4 space-y-4 overflow-y-auto max-h-[60vh]">
+      {/* Contract summary */}
+      <div>
+        <p className={`text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Contract</p>
+        <div className={`${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f8f8f8]'} border ${c.border} rounded-xl p-4 space-y-3`}>
+          <div className="flex items-start justify-between gap-2">
+            <p className={`text-sm font-bold ${c.text} leading-snug`}>{contract.title}</p>
+            <span className={`text-xs font-bold flex-shrink-0 ${cs.color}`}>{cs.label}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className={`text-xs ${c.muted}`}>Total Value</span>
+            <span className="text-sm font-extrabold text-green-500">
+              ₦{contract.total_value?.toLocaleString()}
+            </span>
+          </div>
+          {/* Signatures */}
+          <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${c.border}`}>
+            {[
+              { name: contract.client?.full_name, label: 'Client', signed: contract.signed_client },
+              { name: contract.freelancer?.full_name, label: 'Freelancer', signed: contract.signed_freelancer },
+            ].map(p => (
+              <div key={p.label} className="flex items-center gap-1.5">
+                {p.signed
+                  ? <CheckCircle size={11} className="text-green-500 flex-shrink-0"/>
+                  : <Clock size={11} className="text-orange-500 flex-shrink-0"/>}
+                <div className="min-w-0">
+                  <p className={`text-xs font-bold truncate ${c.text}`}>{p.name || p.label}</p>
+                  <p className={`text-xs ${p.signed ? 'text-green-500' : 'text-orange-500'}`}>
+                    {p.signed ? 'Signed' : 'Pending'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Progress */}
+          {milestones.length > 0 && (
+            <div>
+              <div className="flex justify-between mb-1">
+                <span className={`text-xs ${c.muted}`}>Progress</span>
+                <span className={`text-xs font-bold ${c.text}`}>{progress}%</span>
+              </div>
+              <div className={`h-1.5 rounded-full ${isDark ? 'bg-[#2e2e2e]' : 'bg-[#e0e0e0]'}`}>
+                <div className="h-1.5 rounded-full bg-green-500 transition-all" style={{ width: `${progress}%` }}/>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Milestones */}
+      {milestones.length > 0 && (
+        <div>
+          <p className={`text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>
+            Milestones ({milestones.length})
+          </p>
+          <div className="space-y-2">
+            {milestones.map((ms, i) => {
+              const s = MS_STATUS[ms.status] || MS_STATUS.pending
+              return (
+                <div key={ms.id}
+                  className={`${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f8f8f8]'} border ${c.border} rounded-xl p-3`}>
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${s.dot}`}/>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <p className={`text-xs font-bold ${c.text} leading-snug`}>
+                          {i + 1}. {ms.title}
+                        </p>
+                        <span className={`text-xs font-bold flex-shrink-0 ${s.color}`}>{s.label}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-xs font-bold text-green-500">
+                          ₦{ms.amount?.toLocaleString()}
+                        </span>
+                        {ms.deadline && (
+                          <span className={`text-xs ${c.muted}`}>
+                            Due {new Date(ms.deadline).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {ms.max_revisions > 0 && (
+                        <p className={`text-xs ${c.muted} mt-1`}>
+                          {ms.revisions_used || 0}/{ms.max_revisions} revisions used
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Escrow status */}
+      <div className={`flex items-center gap-2 p-3 rounded-xl
+        ${contract.escrow_funded
+          ? 'bg-green-500/5 border border-green-500/20'
+          : isDark ? 'bg-[#1a1a1a] border border-[#2e2e2e]' : 'bg-[#f8f8f8] border border-[#e0e0e0]'}`}>
+        <Lock size={12} className={contract.escrow_funded ? 'text-green-500' : c.muted}/>
+        <p className={`text-xs font-bold ${contract.escrow_funded ? 'text-green-500' : c.muted}`}>
+          {contract.escrow_funded ? 'Escrow funded — payment protected' : 'Escrow not yet funded'}
         </p>
       </div>
     </div>
@@ -85,13 +302,13 @@ function MsgBubble({ msg, isDark, c, myId }) {
 
 // ── Chat view ──────────────────────────────────────────────
 function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
-  const [msgs, setMsgs]           = useState([])
-  const [input, setInput]         = useState('')
-  const [scamFlag, setScamFlag]   = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
+  const [msgs, setMsgs]             = useState([])
+  const [input, setInput]           = useState('')
+  const [scamFlag, setScamFlag]     = useState(false)
+  const [aiLoading, setAiLoading]   = useState(false)
   const [colleActive, setColleActive] = useState(false)
-  const [showInfo, setShowInfo]   = useState(false)
-  const [loading, setLoading]     = useState(true)
+  const [showPanel, setShowPanel]   = useState(false)
+  const [loading, setLoading]       = useState(true)
   const bottomRef = useRef(null)
   const fileRef   = useRef(null)
 
@@ -102,17 +319,12 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
 
   useEffect(() => {
     fetchMessages()
-    const channel = supabase
-      .channel('chat-' + chat.id)
+    const channel = supabase.channel('chat-' + chat.id)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public',
         table: 'messages', filter: `chat_id=eq.${chat.id}`
       }, payload => {
-        setMsgs(prev => {
-          // avoid duplicates
-          if (prev.find(m => m.id === payload.new.id)) return prev
-          return [...prev, payload.new]
-        })
+        setMsgs(prev => prev.find(m => m.id === payload.new.id) ? prev : [...prev, payload.new])
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
@@ -135,263 +347,334 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
   const sendMsg = async () => {
     const text = input.trim()
     if (!text) return
-
-    // Scam detection
     if (SCAM_WORDS.some(w => text.toLowerCase().includes(w))) {
-      setScamFlag(true)
-      return
+      setScamFlag(true); return
     }
-
-    // Colle trigger
     if (COLLE_TRIGGER.test(text)) {
-      setInput('')
-      callColle(text)
-      return
+      setInput(''); callColle(text); return
     }
-
-    setInput('')
-    setScamFlag(false)
-
+    setInput(''); setScamFlag(false)
     await supabase.from('messages').insert({
-      chat_id: chat.id,
-      sender_id: myId,
-      content: text,
-      type: 'text',
+      chat_id: chat.id, sender_id: myId, content: text, type: 'text',
     })
   }
 
   const sendFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+    const file = e.target.files?.[0]; if (!file) return
     const path = `${chat.id}/${Date.now()}-${file.name}`
-    const { error } = await supabase.storage
-      .from('deliverables')
-      .upload(path, file, { upsert: false })
-
-    if (!error) {
-      const { data } = supabase.storage.from('deliverables').getPublicUrl(path)
-      await supabase.from('messages').insert({
-        chat_id: chat.id,
-        sender_id: myId,
-        content: file.name,
-        file_url: data.publicUrl,
-        file_name: file.name,
-        file_size: file.size,
-        type: 'file',
-      })
-    } else {
-      // Still show locally even if storage fails
-      await supabase.from('messages').insert({
-        chat_id: chat.id,
-        sender_id: myId,
-        content: file.name,
-        file_name: file.name,
-        file_size: file.size,
-        type: 'file',
-      })
-    }
+    const { error } = await supabase.storage.from('deliverables').upload(path, file)
+    const { data: urlData } = supabase.storage.from('deliverables').getPublicUrl(path)
+    await supabase.from('messages').insert({
+      chat_id: chat.id, sender_id: myId,
+      content: file.name,
+      file_url: !error ? urlData.publicUrl : null,
+      file_name: file.name, file_size: file.size, type: 'file',
+    })
     e.target.value = ''
   }
 
   const callColle = async (userMessage) => {
-    setAiLoading(true)
-    setColleActive(true)
-
-    // First insert a "Colle is thinking..." system message
+    setAiLoading(true); setColleActive(true)
     await supabase.from('messages').insert({
-      chat_id: chat.id,
-      sender_id: null,
-      content: `${displayName} called Colle...`,
-      type: 'system',
+      chat_id: chat.id, sender_id: null,
+      content: `${displayName} summoned Colle...`, type: 'system',
     })
-
-    // Build conversation history for context
-    const history = msgs
-      .filter(m => m.type === 'text')
+    const history = msgs.filter(m => m.type === 'text')
       .map(m => `${m.sender_id === myId ? displayName : partyName}: ${m.content}`)
       .join('\n')
-
-    const prompt = userMessage.length > 6
-      ? `The user said: "${userMessage}"\n\nConversation so far:\n${history || 'No messages yet.'}`
-      : `Conversation so far:\n${history || 'No messages yet — just introduced yourself.'}`
-
+    const prompt = `${userMessage.length > 6 ? `The user asked: "${userMessage}"\n\n` : ''}Conversation so far:\n${history || 'No messages yet.'}`
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: `You are Colle, the AI legal assistant built into Collectica — a contract-first freelance platform for Africa. You are present in every chat between a client and freelancer. You help them:
-1. Draft contracts from their conversation
-2. Define milestones and payment terms
-3. Protect both parties from disputes
-4. Answer questions about their agreement
-
-Be concise, professional, and helpful. Address both parties. If asked to draft a contract, extract key terms from the conversation and present them clearly. Always remind users that funds are held in escrow for protection.`,
+          model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+          system: `You are Colle, the AI legal assistant built into Collectica — a contract-first freelance platform for Africa. You are present in every chat between a client and freelancer. Help them draft contracts, define milestones, set payment terms, and protect both parties from disputes. Be concise and professional. If asked to draft a contract, extract key terms from the conversation clearly. Always remind users funds are held in escrow.`,
           messages: [{ role: 'user', content: prompt }]
         })
       })
       const data = await res.json()
-      const text = data.content?.[0]?.text || 'I could not process that request. Please try again.'
-
+      const text = data.content?.[0]?.text || 'I could not process that right now. Please try again.'
       await supabase.from('messages').insert({
-        chat_id: chat.id,
-        sender_id: null,
-        content: text,
-        type: 'colle',
+        chat_id: chat.id, sender_id: null, content: text, type: 'colle',
       })
     } catch {
       await supabase.from('messages').insert({
-        chat_id: chat.id,
-        sender_id: null,
-        content: 'I\'m having trouble connecting right now. Please try again in a moment.',
+        chat_id: chat.id, sender_id: null,
+        content: 'Having trouble connecting. Please try again.',
         type: 'colle',
       })
-    } finally {
-      setAiLoading(false)
-    }
+    } finally { setAiLoading(false) }
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Chat header */}
-      <div className={`flex items-center gap-3 px-4 py-3 border-b ${c.border} flex-shrink-0 ${isDark ? 'bg-[#111]' : 'bg-white'}`}>
-        {onBack && (
-          <button onClick={onBack}
-            className={`p-1.5 rounded-lg ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} md:hidden`}>
-            <ArrowLeft size={16} className={c.text}/>
-          </button>
-        )}
-        <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} border ${c.border} flex items-center justify-center font-bold text-sm ${c.text} flex-shrink-0`}>
-          {initials}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold ${c.text}`}>{partyName || 'Unknown'}</p>
-          <p className={`text-xs ${c.muted}`}>
-            {chat.contract?.title || chat.job?.title || 'Contract chat'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {chat.contract && (
-            <div className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${c.border} text-xs font-bold text-green-500`}>
-              <Lock size={10}/> Escrow Active
-            </div>
+    <div className="flex h-full overflow-hidden">
+      {/* Main chat column */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Chat header */}
+        <div className={`flex items-center gap-3 px-4 py-3 border-b ${c.border} flex-shrink-0 ${isDark ? 'bg-[#111]' : 'bg-white'}`}>
+          {onBack && (
+            <button onClick={onBack} className={`p-1.5 rounded-lg ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} md:hidden`}>
+              <ArrowLeft size={16} className={c.text}/>
+            </button>
           )}
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${c.border} text-xs font-bold`}
-            style={{ color: colleActive ? '#22c55e' : undefined }}>
-            <Bot size={10} className={colleActive ? 'text-green-500' : c.muted}/>
-            <span className={colleActive ? 'text-green-500' : c.muted}>Colle</span>
+          <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} border ${c.border} flex items-center justify-center font-bold text-sm ${c.text} flex-shrink-0`}>
+            {initials}
           </div>
-          <button onClick={() => setShowInfo(p => !p)}
-            className={`p-2 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} ${c.light}`}>
-            <ChevronRight size={15} className={showInfo ? 'rotate-90 transition-transform' : 'transition-transform'}/>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-bold ${c.text}`}>{partyName || 'Unknown'}</p>
+            <p className={`text-xs ${c.muted}`}>{chat.contract?.title || chat.job?.title || 'Conversation'}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${c.border} text-xs font-bold`}>
+              <Bot size={10} className={colleActive ? 'text-green-500' : c.muted}/>
+              <span className={colleActive ? 'text-green-500' : c.muted}>Colle</span>
+            </div>
+            {/* Contract panel toggle */}
+            <button onClick={() => setShowPanel(p => !p)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all
+                ${showPanel
+                  ? 'border-green-500/30 bg-green-500/10 text-green-500'
+                  : `${c.border} ${c.light} ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f0f0f0]'}`}`}>
+              <FileText size={11}/>
+              <span className="hidden sm:inline">Contract</span>
+              {showPanel ? <ChevronUp size={11}/> : <ChevronDown size={11}/>}
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-2 py-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : msgs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-8 gap-4">
+              <div className="text-4xl">👋</div>
+              <div>
+                <p className={`font-bold ${c.text}`}>Start the conversation</p>
+                <p className={`text-xs ${c.muted} mt-1`}>
+                  Type <span className="text-green-500 font-bold">Colle</span> to get AI help drafting your contract.
+                </p>
+              </div>
+            </div>
+          ) : msgs.map(m => <MsgBubble key={m.id} msg={m} isDark={isDark} c={c} myId={myId}/>)}
+          <div ref={bottomRef}/>
+        </div>
+
+        {/* Scam warning */}
+        {scamFlag && (
+          <div className="mx-4 mb-3 flex items-start gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10">
+            <AlertTriangle size={13} className="text-red-500 mt-0.5 flex-shrink-0"/>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-red-500">⚠️ Off-platform payment detected</p>
+              <p className="text-xs text-red-400 mt-0.5">This removes your escrow protection. Please edit your message.</p>
+            </div>
+            <button onClick={() => setScamFlag(false)}><X size={12} className="text-red-400"/></button>
+          </div>
+        )}
+
+        {/* Colle typing */}
+        {aiLoading && (
+          <div className="flex items-center gap-2 px-6 py-2">
+            <Bot size={12} className="text-green-500"/>
+            <div className="flex gap-1">
+              {[0,1,2].map(i => (
+                <div key={i} className="w-1.5 h-1.5 rounded-full bg-green-500 animate-bounce"
+                  style={{ animationDelay: `${i * 0.15}s` }}/>
+              ))}
+            </div>
+            <span className="text-xs text-green-500 font-medium">Colle is thinking...</span>
+          </div>
+        )}
+
+        {/* Input */}
+        <div className={`flex items-center gap-2 px-4 py-3 border-t ${c.border} flex-shrink-0 ${isDark ? 'bg-[#111]' : 'bg-white'}`}>
+          <input ref={fileRef} type="file" className="hidden" onChange={sendFile}/>
+          <button onClick={() => fileRef.current?.click()}
+            className={`p-2.5 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} ${c.light} flex-shrink-0`}>
+            <Paperclip size={15}/>
+          </button>
+          <button onClick={() => setInput('Colle')} title="Summon Colle"
+            className="p-2.5 rounded-xl flex-shrink-0 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 transition-all">
+            <Bot size={15}/>
+          </button>
+          <input type="text"
+            placeholder='Message... or type "Colle" for AI help'
+            value={input}
+            onChange={e => { setInput(e.target.value); setScamFlag(false) }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
+            className={`flex-1 px-4 py-2.5 rounded-xl border text-sm outline-none transition-all
+              ${isDark
+                ? 'bg-[#1a1a1a] text-white placeholder-[#444] border-[#2e2e2e] focus:border-green-500/50'
+                : 'bg-[#f8f8f8] text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0] focus:border-[#0a0a0a]'}`}/>
+          <button onClick={sendMsg} disabled={!input.trim() || aiLoading}
+            className={`p-2.5 rounded-xl flex-shrink-0 transition-all disabled:opacity-30
+              ${isDark ? 'bg-white text-[#0a0a0a]' : 'bg-[#0a0a0a] text-white'}`}>
+            <Send size={15}/>
           </button>
         </div>
       </div>
 
-      {/* Contract info panel */}
-      {showInfo && (
-        <div className={`border-b ${c.border} px-4 py-3 ${isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]'}`}>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { icon: <FileText size={13}/>, label: 'Contracts', path: '/contracts' },
-              { icon: <Wallet size={13}/>, label: 'Escrow', path: '/escrow' },
-              { icon: <Shield size={13}/>, label: 'Trust', path: '/trust' },
-            ].map(item => (
-              <Link key={item.label} to={item.path}
-                className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border ${c.border} text-xs font-semibold ${c.light} text-center transition-all ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f0f0f0]'}`}>
-                {item.icon}{item.label}
-              </Link>
-            ))}
-          </div>
-          <p className={`text-xs ${c.muted} mt-3 text-center`}>
-            💡 Type <span className="font-bold text-green-500">Colle</span> in the chat to summon AI contract assistance
-          </p>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-2 py-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
-          </div>
-        ) : msgs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8 gap-4">
-            <div className="text-4xl">👋</div>
-            <div>
-              <p className={`font-bold ${c.text}`}>Start the conversation</p>
-              <p className={`text-xs ${c.muted} mt-1`}>
-                Type <span className="text-green-500 font-bold">Colle</span> at any time to get AI help drafting your contract.
-              </p>
+      {/* Contract + milestones side panel */}
+      {showPanel && (
+        <div className={`w-72 flex-shrink-0 border-l ${c.border} flex flex-col ${isDark ? 'bg-[#111]' : 'bg-white'} overflow-hidden`}>
+          <div className={`flex items-center justify-between px-4 py-3 border-b ${c.border}`}>
+            <div className="flex items-center gap-2">
+              <FileText size={13} className={c.muted}/>
+              <p className={`text-xs font-bold ${c.text}`}>Contract & Milestones</p>
             </div>
+            <button onClick={() => setShowPanel(false)} className={c.muted}>
+              <X size={14}/>
+            </button>
           </div>
-        ) : (
-          msgs.map(m => (
-            <MsgBubble key={m.id} msg={m} isDark={isDark} c={c} myId={myId}/>
-          ))
+          <div className="flex-1 overflow-y-auto">
+            <ContractPanel chatId={chat.id} isDark={isDark} c={c}/>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Notifications bell ─────────────────────────────────────
+function NotificationsBell({ userId, isDark, c }) {
+  const [notifs, setNotifs]     = useState([])
+  const [open, setOpen]         = useState(false)
+  const [unread, setUnread]     = useState(0)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    fetchNotifs()
+    // Real-time — listen to transactions and messages
+    const ch = supabase.channel('notifs-' + userId)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'transactions',
+        filter: `user_id=eq.${userId}`
+      }, () => fetchNotifs())
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages'
+      }, () => fetchNotifs())
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'contracts'
+      }, () => fetchNotifs())
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'milestones'
+      }, () => fetchNotifs())
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [userId])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const fetchNotifs = async () => {
+    const items = []
+
+    // Recent transactions
+    const { data: txs } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (txs) txs.forEach(tx => items.push({
+      id: 'tx-' + tx.id,
+      type: tx.type,
+      text: tx.description || tx.type,
+      time: tx.created_at,
+      amount: tx.amount,
+    }))
+
+    // Recent milestone updates on user's contracts
+    const { data: contracts } = await supabase
+      .from('contracts')
+      .select('id')
+      .or(`client_id.eq.${userId},freelancer_id.eq.${userId}`)
+
+    if (contracts?.length > 0) {
+      const contractIds = contracts.map(c => c.id)
+      const { data: ms } = await supabase
+        .from('milestones')
+        .select('*, contract:contracts(title)')
+        .in('contract_id', contractIds)
+        .in('status', ['submitted', 'approved', 'paid'])
+        .order('updated_at', { ascending: false })
+        .limit(5)
+
+      if (ms) ms.forEach(m => items.push({
+        id: 'ms-' + m.id,
+        type: 'milestone',
+        text: `Milestone "${m.title}" is ${m.status} — ${m.contract?.title || 'contract'}`,
+        time: m.updated_at || m.created_at,
+      }))
+    }
+
+    // Sort by time
+    items.sort((a, b) => new Date(b.time) - new Date(a.time))
+    setNotifs(items.slice(0, 10))
+    setUnread(items.filter(n => {
+      const age = (Date.now() - new Date(n.time)) / 1000 / 60
+      return age < 60 // unread = last hour
+    }).length)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(p => !p)}
+        className={`relative w-9 h-9 rounded-full border flex items-center justify-center transition-all
+          ${open
+            ? 'border-green-500/30 bg-green-500/10 text-green-500'
+            : `${c.border} ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} ${c.light}`}`}>
+        <Bell size={15}/>
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 text-white text-[9px] font-bold flex items-center justify-center">
+            {unread > 9 ? '9+' : unread}
+          </span>
         )}
-        <div ref={bottomRef}/>
-      </div>
+      </button>
 
-      {/* Scam warning */}
-      {scamFlag && (
-        <div className="mx-4 mb-3 flex items-start gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10">
-          <AlertTriangle size={13} className="text-red-500 mt-0.5 flex-shrink-0"/>
-          <div className="flex-1">
-            <p className="text-xs font-bold text-red-500">⚠️ Off-platform payment detected</p>
-            <p className="text-xs text-red-400 mt-0.5">
-              This message suggests payment outside Collectica. This removes your escrow protection. Please edit your message.
-            </p>
+      {open && (
+        <div className={`absolute right-0 top-11 w-80 rounded-2xl border shadow-2xl z-50 overflow-hidden
+          ${isDark ? 'bg-[#111] border-[#2e2e2e]' : 'bg-white border-[#e0e0e0]'}`}>
+          <div className={`flex items-center justify-between px-4 py-3 border-b ${c.border}`}>
+            <p className={`text-sm font-bold ${c.text}`}>Notifications</p>
+            {unread > 0 && (
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-bold">
+                {unread} new
+              </span>
+            )}
           </div>
-          <button onClick={() => setScamFlag(false)}><X size={12} className="text-red-400"/></button>
+          <div className="max-h-80 overflow-y-auto divide-y" style={{ borderColor: isDark ? '#2e2e2e' : '#e8e8e8' }}>
+            {notifs.length > 0 ? notifs.map(n => (
+              <div key={n.id} className={`flex items-start gap-3 px-4 py-3 transition-colors
+                ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f8f8f8]'}`}>
+                <span className="text-base flex-shrink-0 mt-0.5">{notifIcon(n.type)}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-medium ${c.text} leading-relaxed`}>{n.text}</p>
+                  <p className={`text-xs ${c.muted} mt-0.5`}>{timeAgo(n.time)}</p>
+                </div>
+                {n.amount && (
+                  <p className="text-xs font-bold text-green-500 flex-shrink-0">
+                    ₦{n.amount?.toLocaleString()}
+                  </p>
+                )}
+              </div>
+            )) : (
+              <div className="py-10 text-center">
+                <p className="text-2xl mb-2">🔔</p>
+                <p className={`text-xs ${c.muted}`}>No notifications yet</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
-
-      {/* Colle typing indicator */}
-      {aiLoading && (
-        <div className="flex items-center gap-2 px-6 py-2">
-          <Bot size={12} className="text-green-500"/>
-          <div className="flex gap-1">
-            {[0,1,2].map(i => (
-              <div key={i} className="w-1.5 h-1.5 rounded-full bg-green-500 animate-bounce"
-                style={{ animationDelay: `${i * 0.15}s` }}/>
-            ))}
-          </div>
-          <span className="text-xs text-green-500 font-medium">Colle is thinking...</span>
-        </div>
-      )}
-
-      {/* Input bar */}
-      <div className={`flex items-center gap-2 px-4 py-3 border-t ${c.border} flex-shrink-0 ${isDark ? 'bg-[#111]' : 'bg-white'}`}>
-        <input ref={fileRef} type="file" className="hidden" onChange={sendFile}/>
-        <button onClick={() => fileRef.current?.click()}
-          className={`p-2.5 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} ${c.light} flex-shrink-0`}>
-          <Paperclip size={15}/>
-        </button>
-        <button onClick={() => { setInput('Colle'); }}
-          title="Summon Colle AI"
-          className="p-2.5 rounded-xl flex-shrink-0 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 transition-all">
-          <Bot size={15}/>
-        </button>
-        <input
-          type="text"
-          placeholder='Message... or type "Colle" for AI help'
-          value={input}
-          onChange={e => { setInput(e.target.value); setScamFlag(false) }}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-          className={`flex-1 px-4 py-2.5 rounded-xl border text-sm outline-none transition-all
-            ${isDark
-              ? 'bg-[#1a1a1a] text-white placeholder-[#444] border-[#2e2e2e] focus:border-green-500/50'
-              : 'bg-[#f8f8f8] text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0] focus:border-[#0a0a0a]'}`}/>
-        <button onClick={sendMsg} disabled={!input.trim() || aiLoading}
-          className={`p-2.5 rounded-xl flex-shrink-0 transition-all disabled:opacity-30
-            ${isDark ? 'bg-white text-[#0a0a0a]' : 'bg-[#0a0a0a] text-white'}`}>
-          <Send size={15}/>
-        </button>
-      </div>
     </div>
   )
 }
@@ -404,12 +687,12 @@ export default function Messages() {
   const [searchParams] = useSearchParams()
   const isDark = theme === 'dark'
 
-  const [chats, setChats]           = useState([])
-  const [jobs, setJobs]             = useState([])
-  const [selected, setSelected]     = useState(null)
+  const [chats, setChats]       = useState([])
+  const [jobs, setJobs]         = useState([])
+  const [selected, setSelected] = useState(null)
   const [mobileView, setMobileView] = useState('list')
-  const [search, setSearch]         = useState('')
-  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]     = useState('')
+  const [loading, setLoading]   = useState(true)
 
   const c = {
     bg:      isDark ? 'bg-[#0a0a0a]'     : 'bg-[#f8f8f8]',
@@ -432,14 +715,11 @@ export default function Messages() {
     if (isFreelancer) fetchJobs()
   }, [user, isFreelancer])
 
-  // Auto-select chat from URL param
   useEffect(() => {
     const contractId = searchParams.get('contract')
     const jobId = searchParams.get('job')
     if ((contractId || jobId) && chats.length > 0) {
-      const match = chats.find(ch =>
-        ch.contract_id === contractId || ch.job_id === jobId
-      )
+      const match = chats.find(ch => ch.contract_id === contractId || ch.job_id === jobId)
       if (match) { setSelected(match); setMobileView('chat') }
     }
   }, [searchParams, chats])
@@ -458,18 +738,17 @@ export default function Messages() {
       .order('created_at', { ascending: false })
 
     if (data) {
-      // Get last message for each chat
-      const chatsWithLast = await Promise.all(data.map(async ch => {
-        const { data: lastMsg } = await supabase
+      const withLast = await Promise.all(data.map(async ch => {
+        const { data: lm } = await supabase
           .from('messages')
           .select('content, created_at, type')
           .eq('chat_id', ch.id)
           .order('created_at', { ascending: false })
           .limit(1)
           .single()
-        return { ...ch, lastMessage: lastMsg }
+        return { ...ch, lastMessage: lm }
       }))
-      setChats(chatsWithLast)
+      setChats(withLast)
     }
     setLoading(false)
   }
@@ -492,8 +771,6 @@ export default function Messages() {
            title.toLowerCase().includes(search.toLowerCase())
   })
 
-  const totalUnread = 0 // will implement with read receipts later
-
   return (
     <div className={`h-screen flex flex-col transition-colors duration-300 ${c.bg}`}>
 
@@ -510,6 +787,8 @@ export default function Messages() {
           <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border ${c.border} text-xs font-bold ${c.muted}`}>
             <Bot size={11} className="text-green-500"/> Colle Active
           </div>
+          {/* Notifications bell */}
+          {user && <NotificationsBell userId={user.id} isDark={isDark} c={c}/>}
           <button onClick={toggle}
             className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm
               ${isDark ? 'border-[#2e2e2e] bg-[#1a1a1a]' : 'border-[#e0e0e0] bg-[#f0f0f0]'}`}>
@@ -520,36 +799,34 @@ export default function Messages() {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Left panel — conversations + job alerts */}
+        {/* Left panel */}
         <div className={`w-full md:w-80 lg:w-96 flex-shrink-0 border-r ${c.border} ${c.card} flex flex-col
           ${mobileView === 'chat' ? 'hidden md:flex' : ''}`}>
 
-          {/* Freelancer job alerts banner */}
+          {/* Freelancer job alerts */}
           {isFreelancer && jobs.length > 0 && (
             <div className={`border-b ${c.border} ${isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]'}`}>
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Bell size={13} className="text-green-500"/>
-                  <span className={`text-xs font-bold ${c.text}`}>New Job Alerts</span>
+                  <span className={`text-xs font-bold ${c.text}`}>Job Alerts</span>
                   <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold">
                     {jobs.length}
                   </span>
                 </div>
-                <Link to="/jobs" className="text-xs text-green-500 font-bold hover:underline">
-                  See all
-                </Link>
+                <Link to="/jobs" className="text-xs text-green-500 font-bold hover:underline">See all</Link>
               </div>
               <div className="px-3 pb-3 space-y-2">
                 {jobs.slice(0, 3).map(job => (
-                  <Link key={job.id} to={`/jobs`}
-                    className={`flex items-start gap-3 p-3 rounded-xl border ${c.border} transition-all
+                  <Link key={job.id} to="/jobs"
+                    className={`flex items-center gap-3 p-3 rounded-xl border ${c.border} transition-all
                       ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-white'} block`}>
                     <div className={`w-8 h-8 rounded-lg ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} border ${c.border} flex items-center justify-center flex-shrink-0`}>
                       <Briefcase size={12} className={c.muted}/>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-bold truncate ${c.text}`}>{job.title}</p>
-                      <p className={`text-xs ${c.muted} mt-0.5`}>
+                      <p className={`text-xs ${c.muted}`}>
                         ₦{job.budget_min?.toLocaleString()} – ₦{job.budget_max?.toLocaleString()}
                       </p>
                     </div>
@@ -575,62 +852,54 @@ export default function Messages() {
               <div className="flex items-center justify-center py-12">
                 <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
               </div>
-            ) : filtered.length > 0 ? (
-              filtered.map(ch => {
-                const party = user.id === ch.client_id ? ch.freelancer : ch.client
-                const name = party?.full_name || 'Unknown'
-                const initials = name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
-                const title = ch.contract?.title || ch.job?.title || 'New conversation'
-                const lastMsg = ch.lastMessage
+            ) : filtered.length > 0 ? filtered.map(ch => {
+              const party = user.id === ch.client_id ? ch.freelancer : ch.client
+              const name = party?.full_name || 'Unknown'
+              const initials = name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+              const title = ch.contract?.title || ch.job?.title || 'Conversation'
+              const lm = ch.lastMessage
 
-                return (
-                  <button key={ch.id}
-                    onClick={() => { setSelected(ch); setMobileView('chat') }}
-                    className={`w-full flex items-start gap-3 px-4 py-4 text-left border-b ${c.border} transition-colors
-                      ${selected?.id === ch.id
-                        ? isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'
-                        : isDark ? 'hover:bg-[#111]' : 'hover:bg-[#f8f8f8]'}`}>
-                    <div className={`w-11 h-11 rounded-xl ${c.bgAcc} border ${c.border} flex items-center justify-center font-bold text-sm ${c.text} flex-shrink-0`}>
-                      {initials}
+              return (
+                <button key={ch.id}
+                  onClick={() => { setSelected(ch); setMobileView('chat') }}
+                  className={`w-full flex items-start gap-3 px-4 py-4 text-left border-b ${c.border} transition-colors
+                    ${selected?.id === ch.id
+                      ? isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'
+                      : isDark ? 'hover:bg-[#111]' : 'hover:bg-[#f8f8f8]'}`}>
+                  <div className={`w-11 h-11 rounded-xl ${c.bgAcc} border ${c.border} flex items-center justify-center font-bold text-sm ${c.text} flex-shrink-0`}>
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-sm font-bold truncate ${c.text}`}>{name}</p>
+                      {lm && <span className={`text-xs flex-shrink-0 ${c.muted}`}>{timeAgo(lm.created_at)}</span>}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={`text-sm font-bold truncate ${c.text}`}>{name}</p>
-                        {lastMsg && (
-                          <span className={`text-xs flex-shrink-0 ${c.muted}`}>
-                            {new Date(lastMsg.created_at).toLocaleDateString()}
-                          </span>
-                        )}
+                    <p className={`text-xs truncate mt-0.5 ${c.muted}`}>{title}</p>
+                    {lm && (
+                      <p className={`text-xs truncate mt-1 ${c.light}`}>
+                        {lm.type === 'colle' ? '🤖 Colle responded'
+                          : lm.type === 'file' ? '📎 File shared'
+                          : lm.type === 'system' ? '🔔 ' + lm.content
+                          : lm.content}
+                      </p>
+                    )}
+                    {ch.contract && (
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <Lock size={9} className="text-green-500"/>
+                        <span className="text-xs text-green-500 font-medium">
+                          ₦{ch.contract.total_value?.toLocaleString()} escrow
+                        </span>
                       </div>
-                      <p className={`text-xs truncate mt-0.5 ${c.muted}`}>{title}</p>
-                      {lastMsg && (
-                        <p className={`text-xs truncate mt-1 ${c.light}`}>
-                          {lastMsg.type === 'colle' ? '🤖 Colle responded'
-                            : lastMsg.type === 'file' ? '📎 File shared'
-                            : lastMsg.type === 'system' ? '🔔 ' + lastMsg.content
-                            : lastMsg.content}
-                        </p>
-                      )}
-                      {ch.contract && (
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <Lock size={9} className="text-green-500"/>
-                          <span className="text-xs text-green-500 font-medium">
-                            ₦{ch.contract.total_value?.toLocaleString()} escrow
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })
-            ) : (
+                    )}
+                  </div>
+                </button>
+              )
+            }) : (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
                 <div className="text-4xl mb-3">💬</div>
                 <p className={`font-bold text-sm ${c.text}`}>No conversations yet</p>
                 <p className={`text-xs ${c.muted} mt-1`}>
-                  {isFreelancer
-                    ? 'Apply for a job to start a conversation with a client.'
-                    : 'Post a job or create a contract to connect with freelancers.'}
+                  {isFreelancer ? 'Apply for a job to start chatting with a client.' : 'Post a job or create a contract to connect.'}
                 </p>
                 <Link to={isFreelancer ? '/jobs' : '/contracts/new'}
                   className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all
@@ -644,8 +913,7 @@ export default function Messages() {
         </div>
 
         {/* Chat area */}
-        <div className={`flex-1 flex flex-col overflow-hidden ${c.bg}
-          ${mobileView === 'list' ? 'hidden md:flex' : ''}`}>
+        <div className={`flex-1 flex flex-col overflow-hidden ${c.bg} ${mobileView === 'list' ? 'hidden md:flex' : ''}`}>
           {selected ? (
             <ChatView
               chat={selected}
@@ -663,7 +931,7 @@ export default function Messages() {
               <div>
                 <p className={`font-bold ${c.text}`}>Select a conversation</p>
                 <p className={`text-sm ${c.muted} mt-1 max-w-xs`}>
-                  Choose a chat to open it. Type <span className="text-green-500 font-bold">Colle</span> in any conversation to get AI contract assistance.
+                  Type <span className="text-green-500 font-bold">Colle</span> in any chat for AI contract assistance.
                 </p>
               </div>
             </div>

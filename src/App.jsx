@@ -13,36 +13,29 @@ import Deliverables from './pages/Deliverables'
 import Messages     from './pages/Messages'
 import Milestones   from './pages/Milestones'
 
-function Spinner() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
-        <p className="text-sm text-[#555] font-medium">Loading Collectica...</p>
-      </div>
-    </div>
-  )
-}
-
+// Only protect pages that need auth — never block login/onboarding
 function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
-  if (loading) return <Spinner/>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+          <p className="text-sm text-[#555] font-medium">Loading Collectica...</p>
+        </div>
+      </div>
+    )
+  }
   return isAuthenticated ? children : <Navigate to="/login" replace />
-}
-
-function PublicRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth()
-  if (loading) return <Spinner/>
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children
 }
 
 function AppRoutes() {
   return (
     <Routes>
-      {/* Public */}
+      {/* Public — render immediately, no auth check blocking */}
       <Route path="/"           element={<Landing />} />
-      <Route path="/login"      element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/onboarding" element={<PublicRoute><Onboarding /></PublicRoute>} />
+      <Route path="/login"      element={<Login />} />
+      <Route path="/onboarding" element={<Onboarding />} />
 
       {/* Protected */}
       <Route path="/dashboard"     element={<PrivateRoute><Dashboard /></PrivateRoute>} />
@@ -55,7 +48,6 @@ function AppRoutes() {
       <Route path="/messages"      element={<PrivateRoute><Messages /></PrivateRoute>} />
       <Route path="/milestones"    element={<PrivateRoute><Milestones /></PrivateRoute>} />
 
-      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

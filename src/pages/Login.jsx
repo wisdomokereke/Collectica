@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, ArrowRight, Shield } from 'lucide-react'
 import { useTheme } from '../lib/ThemeContext'
@@ -6,24 +6,29 @@ import { useAuth } from '../lib/AuthContext'
 
 export default function Login() {
   const { theme, toggle } = useTheme()
-  const { signIn } = useAuth()
+  const { signIn, isAuthenticated, loading } = useAuth()
   const navigate = useNavigate()
   const isDark = theme === 'dark'
 
-  const [email, setEmail]       = useState('')
+  const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
-  const [showPw, setShowPw]     = useState(false)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [showPw, setShowPw]   = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError]     = useState('')
+
+  // If already logged in, go to dashboard
+  useEffect(() => {
+    if (!loading && isAuthenticated) navigate('/dashboard', { replace: true })
+  }, [isAuthenticated, loading])
 
   const c = {
-    bg:     isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]',
-    card:   isDark ? 'bg-[#111]'    : 'bg-white',
-    border: isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
-    text:   isDark ? 'text-white'   : 'text-[#0a0a0a]',
-    muted:  isDark ? 'text-[#555]'  : 'text-[#aaa]',
-    light:  isDark ? 'text-[#888]'  : 'text-[#666]',
-    input:  isDark
+    bg:      isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]',
+    card:    isDark ? 'bg-[#111]'    : 'bg-white',
+    border:  isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
+    text:    isDark ? 'text-white'   : 'text-[#0a0a0a]',
+    muted:   isDark ? 'text-[#555]'  : 'text-[#aaa]',
+    light:   isDark ? 'text-[#888]'  : 'text-[#666]',
+    input:   isDark
       ? 'bg-[#1a1a1a] text-white placeholder-[#444] border-[#2e2e2e] focus:border-white'
       : 'bg-white text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0] focus:border-[#0a0a0a]',
     btnPrim: isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]',
@@ -33,34 +38,36 @@ export default function Login() {
     e.preventDefault()
     setError('')
     if (!email || !password) { setError('Please fill in all fields.'); return }
-    setLoading(true)
+    setSubmitting(true)
     try {
       await signIn({ email, password })
-      navigate('/dashboard')
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err.message || 'Invalid email or password.')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   return (
     <div className={`min-h-screen flex transition-colors duration-300 ${c.bg}`}>
 
-      {/* Left — brand panel */}
+      {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 bg-[#0a0a0a] p-14">
         <div className="flex items-center gap-2">
-          <Shield size={18} className="text-[#4F46E5]"/>
+          <div className="w-7 h-7 rounded-lg bg-[#0a0a0a] border border-[#2e2e2e] flex items-center justify-center">
+            <Shield size={14} className="text-green-500"/>
+          </div>
           <span className="text-white font-extrabold tracking-tight text-lg">Collectica</span>
         </div>
         <div>
           <p className="text-4xl font-extrabold text-white leading-tight mb-6">
             Every deal.<br/>
             Protected by<br/>
-            <span className="text-[#4F46E5]">contract.</span>
+            <span className="text-green-500">contract.</span>
           </p>
           <p className="text-[#555] text-sm leading-relaxed max-w-sm">
-            Collectica holds your money, enforces the contract, and only releases payment when the work is done. Built for African freelancers and the clients who hire them.
+            Collectica holds your money, enforces the contract, and only releases payment when the work is done.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -82,7 +89,7 @@ export default function Login() {
             <h1 className={`text-3xl font-extrabold tracking-tight ${c.text} mb-2`}>Welcome back</h1>
             <p className={`text-sm ${c.light}`}>
               New to Collectica?{' '}
-              <Link to="/onboarding" className="text-[#4F46E5] font-semibold hover:underline">
+              <Link to="/onboarding" className="text-green-500 font-semibold hover:underline">
                 Create an account
               </Link>
             </p>
@@ -97,35 +104,25 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className={`block text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Email</label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
+              <input type="email" placeholder="you@example.com" value={email}
                 onChange={e => setEmail(e.target.value)}
-                className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}
-              />
+                className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
             </div>
-
             <div>
               <label className={`block text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Password</label>
               <div className="relative">
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
+                <input type={showPw ? 'text' : 'password'} placeholder="••••••••" value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className={`w-full pl-4 pr-12 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}
-                />
+                  className={`w-full pl-4 pr-12 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
                 <button type="button" onClick={() => setShowPw(!showPw)}
                   className={`absolute right-4 top-1/2 -translate-y-1/2 ${c.muted}`}>
                   {showPw ? <EyeOff size={15}/> : <Eye size={15}/>}
                 </button>
               </div>
             </div>
-
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={submitting}
               className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${c.btnPrim}`}>
-              {loading
+              {submitting
                 ? <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> Signing in...</>
                 : <><ArrowRight size={15}/> Sign in</>}
             </button>

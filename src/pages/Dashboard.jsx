@@ -12,18 +12,18 @@ import { supabase } from '../lib/supabase'
 
 // ── Navigation items ───────────────────────────────────────
 const NAV = [
-  { icon: <LayoutDashboard size={17}/>, label: 'Overview',     path: '/dashboard' },
-  { icon: <Briefcase size={17}/>,       label: 'Jobs',         path: '/jobs' },
-  { icon: <FileText size={17}/>,        label: 'Contracts',    path: '/contracts' },
-  { icon: <Wallet size={17}/>,          label: 'Escrow',       path: '/escrow' },
-  { icon: <MessageSquare size={17}/>,   label: 'Messages',     path: '/messages' },
-  { icon: <Shield size={17}/>,          label: 'Trust Engine', path: '/trust' },
+  { icon: <LayoutDashboard size={17} />, label: 'Overview', path: '/dashboard' },
+  { icon: <Briefcase size={17} />, label: 'Jobs', path: '/jobs' },
+  { icon: <FileText size={17} />, label: 'Contracts', path: '/contracts' },
+  { icon: <Wallet size={17} />, label: 'Escrow', path: '/escrow' },
+  { icon: <MessageSquare size={17} />, label: 'Messages', path: '/messages' },
+  { icon: <Shield size={17} />, label: 'Trust Engine', path: '/trust' },
 ]
 
 // ── Timezone-aware greeting ────────────────────────────────
 function getGreeting() {
   const hour = new Date().getHours()
-  if (hour >= 5  && hour < 12) return 'Good morning'
+  if (hour >= 5 && hour < 12) return 'Good morning'
   if (hour >= 12 && hour < 17) return 'Good afternoon'
   if (hour >= 17 && hour < 21) return 'Good evening'
   return 'Good night'
@@ -32,8 +32,8 @@ function getGreeting() {
 // ── Typewriter animation ───────────────────────────────────
 function useTypewriter(texts, typingSpeed = 45, deletingSpeed = 25, pauseMs = 2500) {
   const [display, setDisplay] = useState('')
-  const [idx, setIdx]         = useState(0)
-  const [typing, setTyping]   = useState(true)
+  const [idx, setIdx] = useState(0)
+  const [typing, setTyping] = useState(true)
   const timer = useRef(null)
 
   useEffect(() => {
@@ -62,13 +62,13 @@ function useTypewriter(texts, typingSpeed = 45, deletingSpeed = 25, pauseMs = 25
 export default function Dashboard() {
   const { theme, toggle } = useTheme()
   const { user, profile, activeView, switchView, signOut, displayName, isFreelancer } = useAuth()
-  const navigate  = useNavigate()
-  const isDark    = theme === 'dark'
+  const navigate = useNavigate()
+  const isDark = theme === 'dark'
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [contracts, setContracts]     = useState([])
-  const [activity, setActivity]       = useState([])
-  const [stats, setStats]             = useState(null)
+  const [contracts, setContracts] = useState([])
+  const [activity, setActivity] = useState([])
+  const [stats, setStats] = useState(null)
   const [loadingData, setLoadingData] = useState(true)
 
   // ── Typewriter texts per role ──────────────────────────
@@ -177,35 +177,35 @@ export default function Dashboard() {
 
   // ── Theme colors ──────────────────────────────────────
   const c = {
-    bg:      isDark ? 'bg-[#0a0a0a]'     : 'bg-[#f8f8f8]',
-    sidebar: isDark ? 'bg-[#111]'        : 'bg-white',
-    card:    isDark ? 'bg-[#111]'        : 'bg-white',
-    bgMid:   isDark ? 'bg-[#1a1a1a]'     : 'bg-[#f0f0f0]',
-    border:  isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
-    text:    isDark ? 'text-white'       : 'text-[#0a0a0a]',
-    muted:   isDark ? 'text-[#555]'      : 'text-[#aaa]',
-    light:   isDark ? 'text-[#888]'      : 'text-[#666]',
+    bg: isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]',
+    sidebar: isDark ? 'bg-[#111]' : 'bg-white',
+    card: isDark ? 'bg-[#111]' : 'bg-white',
+    bgMid: isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]',
+    border: isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
+    text: isDark ? 'text-white' : 'text-[#0a0a0a]',
+    muted: isDark ? 'text-[#555]' : 'text-[#aaa]',
+    light: isDark ? 'text-[#888]' : 'text-[#666]',
     navItem: isDark
       ? 'text-[#555] hover:bg-[#1a1a1a] hover:text-white'
       : 'text-[#aaa] hover:bg-[#f0f0f0] hover:text-[#0a0a0a]',
-    navAct:  isDark ? 'bg-[#1a1a1a] text-white' : 'bg-[#f0f0f0] text-[#0a0a0a]',
-    btn:     isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]',
-    divider: isDark ? 'bg-[#2e2e2e]'     : 'bg-[#e0e0e0]',
+    navAct: isDark ? 'bg-[#1a1a1a] text-white' : 'bg-[#f0f0f0] text-[#0a0a0a]',
+    btn: isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]',
+    divider: isDark ? 'bg-[#2e2e2e]' : 'bg-[#e0e0e0]',
   }
 
   const STATUS_COLORS = {
-    active:             'text-green-500 bg-green-500/10',
+    active: 'text-green-500 bg-green-500/10',
     pending_signatures: 'text-orange-500 bg-orange-500/10',
-    draft:              'text-blue-400 bg-blue-400/10',
-    completed:          'text-[#888] bg-white/5',
+    draft: 'text-blue-400 bg-blue-400/10',
+    completed: 'text-[#888] bg-white/5',
   }
 
   const txIcon = (type) => ({
-    deposit:        '💳',
-    escrow_lock:    '🔒',
+    deposit: '💳',
+    escrow_lock: '🔒',
     escrow_release: '💸',
-    withdrawal:     '🏦',
-    refund:         '↩️',
+    withdrawal: '🏦',
+    refund: '↩️',
   }[type] || '📋')
 
   // ── Sidebar ────────────────────────────────────────────
@@ -216,7 +216,7 @@ export default function Dashboard() {
       <div className={`flex items-center justify-between px-5 py-5 border-b ${c.border}`}>
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg bg-[#0a0a0a] flex items-center justify-center">
-            <Shield size={13} className="text-green-500"/>
+            <Shield size={13} className="text-green-500" />
           </div>
           <span className={`text-sm font-extrabold tracking-tight ${c.text}`}>Collectica</span>
         </Link>
@@ -260,7 +260,7 @@ export default function Dashboard() {
           </div>
           <div className={`h-1.5 rounded-full ${c.bgMid}`}>
             <div className="h-1.5 rounded-full bg-green-500 transition-all duration-700"
-              style={{ width: `${profile?.trust_score || 70}%` }}/>
+              style={{ width: `${profile?.trust_score || 70}%` }} />
           </div>
         </div>
       </div>
@@ -286,7 +286,7 @@ export default function Dashboard() {
         </p>
         <Link to="/escrow"
           className="text-xs text-green-500/70 hover:text-green-500 font-semibold mt-1 inline-flex items-center gap-1">
-          Manage <ArrowUpRight size={10}/>
+          Manage <ArrowUpRight size={10} />
         </Link>
       </div>
 
@@ -295,7 +295,7 @@ export default function Dashboard() {
         <button
           onClick={async () => { await signOut(); navigate('/login') }}
           className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${c.navItem}`}>
-          <LogOut size={17}/> Log out
+          <LogOut size={17} /> Log out
         </button>
       </div>
     </aside>
@@ -306,15 +306,15 @@ export default function Dashboard() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:flex w-64 flex-shrink-0 flex-col h-full">
-        <Sidebar/>
+        <Sidebar />
       </div>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)}/>
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <div className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col">
-            <Sidebar/>
+            <Sidebar />
           </div>
         </>
       )}
@@ -327,7 +327,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)}
               className={`lg:hidden p-2 rounded-lg ${c.bgMid}`}>
-              <Menu size={18} className={c.text}/>
+              <Menu size={18} className={c.text} />
             </button>
             <div>
               <h1 className={`text-lg font-extrabold tracking-tight ${c.text}`}>
@@ -342,7 +342,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <Link to="/contracts/new"
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
-              <Plus size={14}/> New Contract
+              <Plus size={14} /> New Contract
             </Link>
           </div>
         </header>
@@ -357,28 +357,28 @@ export default function Dashboard() {
                 label: 'Wallet Balance',
                 value: `₦${(stats?.wallet || 0).toLocaleString()}`,
                 sub: 'Available funds',
-                icon: <Wallet size={15}/>,
+                icon: <Wallet size={15} />,
                 color: 'text-green-500',
               },
               {
                 label: 'Active Contracts',
                 value: stats?.activeContracts ?? '—',
                 sub: `${stats?.totalContracts ?? 0} total`,
-                icon: <FileText size={15}/>,
+                icon: <FileText size={15} />,
                 color: c.text,
               },
               {
                 label: isFreelancer ? 'Pending Approvals' : 'Awaiting Review',
                 value: stats?.pendingMilestones ?? '—',
                 sub: 'Milestones submitted',
-                icon: <Clock size={15}/>,
+                icon: <Clock size={15} />,
                 color: stats?.pendingMilestones > 0 ? 'text-orange-500' : c.text,
               },
               {
                 label: 'Trust Score',
                 value: `${stats?.trustScore ?? 70}/100`,
                 sub: 'Your reputation',
-                icon: <Shield size={15}/>,
+                icon: <Shield size={15} />,
                 color: 'text-green-500',
               },
             ].map(stat => (
@@ -388,7 +388,7 @@ export default function Dashboard() {
                   <span className="text-xs font-bold uppercase tracking-widest">{stat.label}</span>
                 </div>
                 <p className={`text-2xl font-extrabold tracking-tight ${stat.color}`}>
-                  {loadingData ? <span className={`inline-block w-16 h-6 rounded ${c.bgMid} animate-pulse`}/> : stat.value}
+                  {loadingData ? <span className={`inline-block w-16 h-6 rounded ${c.bgMid} animate-pulse`} /> : stat.value}
                 </p>
                 <p className={`text-xs mt-1 ${c.muted}`}>{stat.sub}</p>
               </div>
@@ -406,12 +406,12 @@ export default function Dashboard() {
 
             {loadingData ? (
               <div className="divide-y" style={{ borderColor: isDark ? '#2e2e2e' : '#e0e0e0' }}>
-                {[1,2,3].map(i => (
+                {[1, 2, 3].map(i => (
                   <div key={i} className="flex items-center gap-4 px-6 py-4">
-                    <div className={`w-10 h-10 rounded-xl ${c.bgMid} animate-pulse`}/>
+                    <div className={`w-10 h-10 rounded-xl ${c.bgMid} animate-pulse`} />
                     <div className="flex-1 space-y-2">
-                      <div className={`h-3 w-32 rounded ${c.bgMid} animate-pulse`}/>
-                      <div className={`h-2 w-20 rounded ${c.bgMid} animate-pulse`}/>
+                      <div className={`h-3 w-32 rounded ${c.bgMid} animate-pulse`} />
+                      <div className={`h-2 w-20 rounded ${c.bgMid} animate-pulse`} />
                     </div>
                   </div>
                 ))}
@@ -421,7 +421,7 @@ export default function Dashboard() {
                 {contracts.map((ct) => {
                   const party = isFreelancer ? ct.client : ct.freelancer
                   const partyName = party?.full_name || 'Unknown'
-                  const initials = partyName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+                  const initials = partyName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                   return (
                     <div key={ct.id}
                       className={`flex items-center gap-4 px-6 py-4 ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f8f8f8]'} transition-colors`}>
@@ -432,7 +432,7 @@ export default function Dashboard() {
                         <p className={`text-sm font-bold truncate ${c.text}`}>{partyName}</p>
                         <p className={`text-xs ${c.muted} truncate`}>{ct.title}</p>
                         <div className={`mt-2 h-1 rounded-full ${c.bgMid}`}>
-                          <div className="h-1 rounded-full bg-green-500" style={{ width: '40%' }}/>
+                          <div className="h-1 rounded-full bg-green-500" style={{ width: '40%' }} />
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -456,7 +456,7 @@ export default function Dashboard() {
                 </p>
                 <Link to={isFreelancer ? '/jobs' : '/contracts/new'}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
-                  <Plus size={13}/> {isFreelancer ? 'Browse Jobs' : 'New Contract'}
+                  <Plus size={13} /> {isFreelancer ? 'Browse Jobs' : 'New Contract'}
                 </Link>
               </div>
             )}

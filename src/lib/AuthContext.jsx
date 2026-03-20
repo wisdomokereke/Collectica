@@ -27,6 +27,7 @@ export function AuthProvider({ children }) {
       setActiveView(prev => prev || data.role) // keep existing view if already set
     } catch (err) {
       console.error('fetchProfile error:', err)
+      setLoading(false)
     } finally {
       setLoading(false)
     }
@@ -39,10 +40,18 @@ export function AuthProvider({ children }) {
 
   // ── Bootstrap session on mount ───────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Safety timeout — if Supabase takes more than 5s, stop loading anyway
+    const timeout = setTimeout(() => setLoading(false), 5000)
+
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      clearTimeout(timeout)
+      if (error) { setLoading(false); return }
       setSession(session)
       if (session?.user) fetchProfile(session.user.id)
       else setLoading(false)
+    }).catch(() => {
+      clearTimeout(timeout)
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -52,7 +61,7 @@ export function AuthProvider({ children }) {
         else { setUser(null); setActiveView(null); setLoading(false) }
       }
     )
-    return () => subscription.unsubscribe()
+    return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [fetchProfile])
 
   // ── Sign up ──────────────────────────────────────────────

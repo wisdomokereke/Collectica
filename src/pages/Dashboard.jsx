@@ -12,6 +12,16 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
   const [applying, setApplying] = useState(false)
   const [applied, setApplied]   = useState(false)
 
+  // Block own jobs — client who switches to freelancer view
+  const isOwnJob = job.client_id === userId
+
+  if (isOwnJob) return (
+    <span className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold
+      ${isDark ? 'bg-[#1a1a1a] text-[#555]' : 'bg-[#f0f0f0] text-[#aaa]'} cursor-not-allowed`}>
+      Your job
+    </span>
+  )
+
   const handleApply = async () => {
     setApplying(true)
     try {
@@ -24,7 +34,6 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
         .single()
 
       if (existing) {
-        // Already applied — go straight to chat
         navigate(`/messages?job=${job.id}`)
         return
       }
@@ -44,18 +53,18 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
 
       // Record application
       await supabase.from('job_applications').insert({
-        job_id:       job.id,
+        job_id:        job.id,
         freelancer_id: userId,
-        chat_id:      chat.id,
-        status:       'pending',
+        chat_id:       chat.id,
+        status:        'pending',
       })
 
-      // Send opening system message from Colle
+      // Colle opens the conversation
       await supabase.from('messages').insert({
         chat_id:   chat.id,
         sender_id: null,
-        content:   `👋 A freelancer has applied for "${job.title}". Both parties are now connected. Type Colle at any time for AI contract assistance.`,
-        type:      'system',
+        content:   `👋 Hi! I'm Colle, your AI contract assistant. A freelancer has expressed interest in "${job.title}".\n\nFeel free to discuss the scope, timeline, and budget. When you're both ready, just say "Colle draft contract" and I'll turn your conversation into a proper contract with milestones. I'm here throughout the entire deal.`,
+        type:      'colle',
       })
 
       setApplied(true)
@@ -168,11 +177,20 @@ export default function Dashboard() {
   ]
   const animText = useTypewriter(TEXTS)
 
+  const [newJobAlert, setNewJobAlert] = useState(false)
+
   useEffect(() => {
     if (!user) { navigate('/login'); return }
     loadAll()
     const ch = supabase.channel('dash-' + user.id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` }, loadAll)
+      // Real-time new job alerts for freelancers
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, (payload) => {
+        if (isFreelancer && payload.new.client_id !== user.id) {
+          setNewJobAlert(true)
+          fetchJobs() // refresh job list immediately
+        }
+      })
       .subscribe()
     return () => supabase.removeChannel(ch)
   }, [user, activeView])
@@ -405,6 +423,19 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+
+        {/* New job alert banner */}
+        {newJobAlert && (
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-green-500/10 border border-green-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/>
+              <p className={`text-sm font-bold text-green-500`}>New job just posted!</p>
+            </div>
+            <button onClick={() => setNewJobAlert(false)} className="text-xs text-green-500 font-bold hover:underline">
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Job search */}
         <div className="relative">

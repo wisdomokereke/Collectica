@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Briefcase, ArrowRight, Upload,
@@ -27,7 +27,7 @@ const DURATIONS = [
 
 export default function NewContract() {
   const { theme } = useTheme()
-  const { user, isFreelancer } = useAuth()
+  const { user, isFreelancer, loading } = useAuth()
   const navigate = useNavigate()
   const isDark = theme === 'dark'
   const fileRef = useRef(null)
@@ -128,23 +128,12 @@ export default function NewContract() {
     }
   }
 
-  // Redirect freelancers — they can't post jobs
-  if (isFreelancer) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${c.bg}`}>
-        <div className={`${c.card} border ${c.border} rounded-2xl p-12 text-center max-w-sm`}>
-          <div className="text-4xl mb-4">🚫</div>
-          <p className={`font-bold ${c.text} mb-2`}>Clients only</p>
-          <p className={`text-sm ${c.light} mb-6`}>
-            Only clients can post jobs. Switch to client view to post.
-          </p>
-          <Link to="/dashboard" className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold ${c.btn}`}>
-            <ArrowLeft size={14}/> Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  // Redirect freelancers instantly — they find jobs, not post them
+  useEffect(() => {
+    if (!loading && isFreelancer) navigate('/jobs', { replace: true })
+  }, [isFreelancer, loading])
+
+  if (isFreelancer) return null
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${c.bg}`}>

@@ -15,16 +15,31 @@ export default function Escrow() {
   const isDark = theme === 'dark'
 
   const [transactions, setTransactions]   = useState([])
-  const [contracts, setContracts]         = useState([])  // contracts that need funding
+  const [contracts, setContracts]         = useState([])
   const [loading, setLoading]             = useState(true)
   const [amount, setAmount]               = useState('')
   const [topping, setTopping]             = useState(false)
   const [topSuccess, setTopSuccess]       = useState(false)
   const [error, setError]                 = useState('')
-  const [fundingContract, setFundingContract] = useState(null) // contract being funded
+  const [fundingContract, setFundingContract] = useState(null)
   const [fundAmount, setFundAmount]       = useState('')
   const [funding, setFunding]             = useState(false)
   const [fundSuccess, setFundSuccess]     = useState(false)
+
+  // Withdrawal state
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [bankName, setBankName]           = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [accountName, setAccountName]     = useState('')
+  const [withdrawing, setWithdrawing]     = useState(false)
+  const [withdrawSuccess, setWithdrawSuccess] = useState('')
+  const [showWithdraw, setShowWithdraw]   = useState(false)
+
+  const BANKS = [
+    'Access Bank', 'Zenith Bank', 'GTBank', 'First Bank', 'UBA',
+    'Stanbic IBTC', 'Fidelity Bank', 'Sterling Bank', 'Wema Bank',
+    'Kuda Bank', 'OPay', 'Palmpay', 'Moniepoint',
+  ]
 
   const c = {
     bg:     isDark ? 'bg-[#0a0a0a]'     : 'bg-[#f8f8f8]',
@@ -184,8 +199,39 @@ export default function Escrow() {
     } finally { setFunding(false) }
   }
 
+
+  // ── Withdrawal ────────────────────────────────────────────
+  const handleWithdraw = async () => {
+    setError('')
+    const parsed = parseFloat(withdrawAmount.replace(/,/g, ''))
+    if (!parsed || parsed <= 0)           { setError('Enter a valid amount');                    return }
+    if (!bankName)                         { setError('Select a bank');                           return }
+    if (!accountNumber || accountNumber.length < 10) { setError('Enter a valid account number'); return }
+    if (!accountName.trim())               { setError('Enter your account name');                 return }
+    if (parsed > (profile?.wallet_balance || 0)) { setError('Insufficient balance');             return }
+
+    setWithdrawing(true)
+    try {
+      const newBalance = (profile?.wallet_balance || 0) - parsed
+      await supabase.from('users').update({ wallet_balance: newBalance }).eq('id', user.id)
+      await supabase.from('transactions').insert({
+        user_id: user.id, type: 'withdrawal', amount: parsed,
+        balance_after: newBalance,
+        description: `Withdrawal to ${bankName} — ${accountName}`,
+        status: 'completed',
+      })
+      await refreshProfile()
+      await fetchTransactions()
+      setWithdrawAmount(''); setAccountNumber(''); setAccountName(''); setBankName('')
+      setWithdrawSuccess(`₦${parsed.toLocaleString()} sent to ${accountName} — ${bankName}`)
+      setTimeout(() => setWithdrawSuccess(''), 5000)
+      setShowWithdraw(false)
+    } catch (err) {
+      setError('Withdrawal failed. Please try again.')
+    } finally { setWithdrawing(false) }
+  }
+
   const txIcon = t => ({
-    deposit:        '💳',
     escrow_lock:    '🔒',
     escrow_release: '💸',
     withdrawal:     '🏦',
@@ -380,6 +426,95 @@ export default function Escrow() {
           <p className={`text-xs ${c.muted} text-center`}>
             🔒 Simulated wallet — no real money involved
           </p>
+        </div>
+
+        {/* Withdrawal success */}
+        {withdrawSuccess && (
+          <div className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-green-500/10 border border-green-500/20">
+            <CheckCircle size={18} className="text-green-500 flex-shrink-0"/>
+            <p className="text-sm font-bold text-green-500">{withdrawSuccess}</p>
+          </div>
+        )}
+
+        {/* Withdraw section */}
+        <div className={`${c.card} border ${c.border} rounded-2xl overflow-hidden`}>
+          <button
+            onClick={() => setShowWithdraw(p => !p)}
+            className={`w-full flex items-center justify-between px-6 py-4 transition-all
+              ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f8f8f8]'}`}>
+            <div className="flex items-center gap-3">
+              <ArrowUpRight size={16} className={c.muted}/>
+              <p className={`text-sm font-bold ${c.text}`}>Withdraw Funds</p>
+            </div>
+            <span className={`text-xs ${c.muted}`}>{showWithdraw ? '▲' : '▼'}</span>
+          </button>
+
+          {showWithdraw && (
+            <div className={`px-6 pb-6 space-y-4 border-t ${c.border} pt-5`}>
+              <p className={`text-xs ${c.light}`}>
+                Available: <span className="font-bold text-green-500">₦{(profile?.wallet_balance || 0).toLocaleString()}</span>
+              </p>
+
+              {/* Bank selection */}
+              <div>
+                <label className={`block text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Bank</label>
+                <select value={bankName} onChange={e => setBankName(e.target.value)}
+                  className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}>
+                  <option value="">Select bank...</option>
+                  {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+
+              {/* Account number */}
+              <div>
+                <label className={`block text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Account Number</label>
+                <input type="text" inputMode="numeric" maxLength={10}
+                  placeholder="0123456789"
+                  value={accountNumber}
+                  onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
+              </div>
+
+              {/* Account name */}
+              <div>
+                <label className={`block text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Account Name</label>
+                <input type="text" placeholder="As it appears on your bank account"
+                  value={accountName}
+                  onChange={e => setAccountName(e.target.value)}
+                  className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className={`block text-xs font-bold uppercase tracking-widest ${c.muted} mb-2`}>Amount</label>
+                <div className="relative">
+                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-bold ${c.muted}`}>₦</span>
+                  <input type="text" inputMode="numeric" placeholder="0"
+                    value={withdrawAmount}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '')
+                      setWithdrawAmount(raw ? parseInt(raw).toLocaleString() : '')
+                    }}
+                    className={`w-full pl-8 pr-4 py-3.5 rounded-xl border text-sm font-bold outline-none transition-all ${c.input}`}/>
+                </div>
+              </div>
+
+              {error && showWithdraw && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>
+              )}
+
+              <button onClick={handleWithdraw} disabled={withdrawing}
+                className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-40 ${c.btn}`}>
+                {withdrawing
+                  ? <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> Processing...</>
+                  : <><ArrowUpRight size={15}/> Withdraw Funds</>}
+              </button>
+
+              <p className={`text-xs ${c.muted} text-center`}>
+                🔒 Simulated withdrawal — no real transfer occurs
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Transaction history */}

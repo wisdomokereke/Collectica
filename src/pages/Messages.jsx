@@ -98,6 +98,9 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
             <span className={`text-xs font-bold ${bothSigned ? 'text-green-500' : 'text-blue-400'}`}>
               {bothSigned ? '✅ Contract Active' : '📄 Contract Draft — Ready to Sign'}
             </span>
+            {meta.version > 1 && (
+              <span className="ml-auto text-xs text-blue-400/60 font-medium">v{meta.version}</span>
+            )}
           </div>
           <div className="px-4 py-4 space-y-3">
             <div>
@@ -475,31 +478,105 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
       if (chat.job.brief_name) jobContext += `\nBrief attached: ${chat.job.brief_name}`
     }
 
-    // Detect if user wants a contract drafted
+    // Detect intent
     const wantsDraft = /draft|contract|set up|create contract|write contract|scope|agree|deal|milestone/i.test(userMessage)
+    const wantsEdit  = /colle.*(change|edit|update|modify|remove|add|revise|fix|adjust)/i.test(userMessage) ||
+                       /(change|edit|update|modify|remove|add|revise|fix|adjust).*(contract|milestone|budget|scope|deadline|payment)/i.test(userMessage)
+
+    // Find existing contract draft in chat if any
+    const existingDraft = msgs.findLast?.(m => m.type === 'contract_draft') ||
+                          [...msgs].reverse().find(m => m.type === 'contract_draft')
 
     const prompt = `${userMessage.length > 6 ? `The user said: "${userMessage}"\n\n` : ''}${jobContext ? `Job Context:${jobContext}\n\n` : ''}Conversation:\n${history || 'No messages yet.'}`
 
     try {
-      if (wantsDraft) {
+      if (wantsEdit && existingDraft) {
+        // User wants to edit an existing contract draft
+        const currentContract = existingDraft.metadata?.contract
+
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+            system: `You are Colle, the AI contract assistant for Collectica. The user wants to edit an existing contract draft. Apply their requested changes and return the COMPLETE updated contract as valid JSON only, with this exact structure:
+{
+  "title": "contract title",
+  "scope": "full scope description",
+  "total_value": 150000,
+  "currency": "NGN",
+  "milestones": [
+    { "title": "name", "description": "what is delivered", "amount": 50000, "order_index": 1 }
+  ],
+  "summary": "one sentence summary of what changed"
+}
+Return ONLY the JSON. Apply the user's edit faithfully.`,
+            messages: [{
+              role: 'user',
+              content: `Current contract:\n${JSON.stringify(currentContract, null, 2)}\n\nUser's edit request: "${userMessage}"\n\nReturn the updated contract JSON.`
+            }]
+          })
+        })
+        const data = await res.json()
+        const raw  = data.content?.[0]?.text || ''
+        try {
+          const updatedContract = JSON.parse(raw.replace(/```json|```/g, '').trim())
+
+          // Insert NEW contract_draft (updated version)
+          await supabase.from('messages').insert({
+            chat_id:   chat.id,
+            sender_id: null,
+            content:   `✏️ Contract updated: ${updatedContract.summary}`,
+            type:      'contract_draft',
+            metadata:  {
+              contract:          updatedContract,
+              signed_client:     false,
+              signed_freelancer: false,
+              client_id:         chat.client_id,
+              freelancer_id:     chat.freelancer_id,
+              version:           (existingDraft.metadata?.version || 1) + 1,
+            },
+          })
+
+          // Colle explains the change
+          await supabase.from('messages').insert({
+            chat_id:   chat.id,
+            sender_id: null,
+            content:   `I've updated the contract above. ${updatedContract.summary}\n\nReview the new version and sign when you're both happy with it.`,
+            type:      'colle',
+          })
+        } catch {
+          await supabase.from('messages').insert({
+            chat_id: chat.id, sender_id: null,
+            content: `I couldn't parse that edit. Try being more specific, like: "Colle change the budget to ₦200,000" or "Colle add a milestone for final delivery".`,
+            type: 'colle',
+          })
+        }
+      } else if (wantsDraft) {
         // Ask Colle to return structured contract JSON
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514', max_tokens: 2000,
-            system: `You are Colle, the AI legal assistant for Collectica. Extract a contract from the conversation and return ONLY valid JSON with this exact structure:
+            system: `You are Colle, the AI legal assistant for Collectica. Extract a fair contract from the conversation. Return ONLY valid JSON:
 {
-  "title": "contract title",
-  "scope": "full scope of work description",
+  "title": "descriptive contract title",
+  "scope": "detailed scope of work — be specific about deliverables",
   "total_value": 150000,
   "currency": "NGN",
   "milestones": [
-    { "title": "milestone name", "description": "what is delivered", "amount": 50000, "order_index": 1 }
+    { "title": "milestone name", "description": "exactly what is delivered at this milestone", "amount": 50000, "order_index": 1 }
   ],
   "summary": "one sentence summary for both parties"
 }
-Use the budget range from the job context. Split payment across milestones sensibly. Return ONLY the JSON, no other text.`,
+Rules:
+- milestone amounts must sum to total_value exactly
+- split payment fairly — first milestone never more than 30% unless agreed
+- be specific in scope, not vague
+- if a brief is attached, use its details
+- if no explicit price agreed, use the middle of the job budget range
+Return ONLY the JSON. No other text.`,
             messages: [{ role: 'user', content: prompt }]
           })
         })
@@ -534,7 +611,12 @@ Use the budget range from the job context. Split payment across milestones sensi
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-            system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. When they're ready to formalise, tell them to type "Colle draft contract" to generate a signable contract. Be concise and friendly.`,
+            system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. 
+
+When they're ready: tell them to type "Colle draft contract" to generate a signable contract from this conversation.
+After drafting: they can say things like "Colle change the budget to ₦200,000" or "Colle add a milestone for testing" to edit it.
+
+Be concise, warm, and helpful. You protect both parties.`,
             messages: [{ role: 'user', content: prompt }]
           })
         })

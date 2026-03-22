@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, FileText, Clock, CheckCircle, AlertTriangle, ChevronRight, Shield } from 'lucide-react'
+import {
+  ArrowLeft, Plus, FileText, Clock, CheckCircle,
+  ChevronRight, Shield, MessageSquare, Bot, Lock
+} from 'lucide-react'
 import { useTheme } from '../lib/ThemeContext'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 
 const STATUS = {
-  active:             { label: 'Active',           color: 'text-green-500',  bg: 'bg-green-500/10'  },
-  pending_signatures: { label: 'Awaiting Signatures', color: 'text-orange-500', bg: 'bg-orange-500/10' },
-  draft:              { label: 'Draft',             color: 'text-blue-400',   bg: 'bg-blue-400/10'   },
-  completed:          { label: 'Completed',         color: 'text-[#888]',     bg: 'bg-white/5'       },
-  disputed:           { label: 'Disputed',          color: 'text-red-500',    bg: 'bg-red-500/10'    },
-  cancelled:          { label: 'Cancelled',         color: 'text-[#555]',     bg: 'bg-white/5'       },
+  active:             { label: 'Active',              color: 'text-green-500',  bg: 'bg-green-500/10',  dot: 'bg-green-500'  },
+  pending_signatures: { label: 'Awaiting Signatures', color: 'text-orange-500', bg: 'bg-orange-500/10', dot: 'bg-orange-500' },
+  draft:              { label: 'Draft',               color: 'text-blue-400',   bg: 'bg-blue-400/10',   dot: 'bg-blue-400'   },
+  completed:          { label: 'Completed',           color: 'text-[#888]',     bg: 'bg-white/5',       dot: 'bg-[#555]'     },
+  disputed:           { label: 'Disputed',            color: 'text-red-500',    bg: 'bg-red-500/10',    dot: 'bg-red-500'    },
+  cancelled:          { label: 'Cancelled',           color: 'text-[#555]',     bg: 'bg-white/5',       dot: 'bg-[#444]'     },
 }
 
 const TABS = [
@@ -41,6 +44,7 @@ export default function Contracts() {
     muted:   isDark ? 'text-[#555]'      : 'text-[#aaa]',
     light:   isDark ? 'text-[#888]'      : 'text-[#666]',
     btn:     isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]',
+    btnGhost:isDark ? 'border-[#2e2e2e] text-[#888] hover:text-white' : 'border-[#e0e0e0] text-[#666] hover:text-[#0a0a0a]',
     divider: isDark ? 'bg-[#2e2e2e]'     : 'bg-[#e0e0e0]',
     tab:     isDark ? 'text-[#555] hover:text-white' : 'text-[#aaa] hover:text-[#0a0a0a]',
     tabAct:  isDark ? 'text-white border-b-2 border-white' : 'text-[#0a0a0a] border-b-2 border-[#0a0a0a]',
@@ -50,14 +54,13 @@ export default function Contracts() {
     if (!user) return
     fetchContracts()
 
-    // Real-time updates when contracts change
     const channel = supabase
       .channel('contracts-' + user.id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, fetchContracts)
       .subscribe()
 
     return () => supabase.removeChannel(channel)
-  }, [user])
+  }, [user, isFreelancer])
 
   const fetchContracts = async () => {
     if (!user) return
@@ -69,7 +72,8 @@ export default function Contracts() {
         *,
         client:users!contracts_client_id_fkey(full_name),
         freelancer:users!contracts_freelancer_id_fkey(full_name),
-        milestones(id, status)
+        milestones(id, status),
+        chat:chats(id)
       `)
       .eq(field, user.id)
       .order('created_at', { ascending: false })
@@ -83,7 +87,9 @@ export default function Contracts() {
     : contracts.filter(c => c.status === tab)
 
   const counts = TABS.reduce((acc, t) => {
-    acc[t.key] = t.key === 'all' ? contracts.length : contracts.filter(c => c.status === t.key).length
+    acc[t.key] = t.key === 'all'
+      ? contracts.length
+      : contracts.filter(c => c.status === t.key).length
     return acc
   }, {})
 
@@ -108,10 +114,16 @@ export default function Contracts() {
               ${isDark ? 'border-[#2e2e2e] bg-[#1a1a1a]' : 'border-[#e0e0e0] bg-[#f0f0f0]'}`}>
             {isDark ? '☀️' : '🌙'}
           </button>
-          {!isFreelancer && (
+          {/* Clients post jobs. Freelancers find jobs. */}
+          {!isFreelancer ? (
             <Link to="/contracts/new"
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
-              <Plus size={14}/> New Contract
+              <Plus size={14}/> Post a Job
+            </Link>
+          ) : (
+            <Link to="/jobs"
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
+              <FileText size={14}/> Browse Jobs
             </Link>
           )}
         </div>
@@ -119,15 +131,41 @@ export default function Contracts() {
 
       <main className="flex-1 px-4 md:px-10 py-10 max-w-4xl mx-auto w-full">
 
-        {/* Title */}
+        {/* Title + how contracts work banner */}
         <div className="mb-8">
           <h1 className={`text-4xl font-extrabold tracking-tight ${c.text}`}>Contracts</h1>
           <p className={`text-sm ${c.light} mt-1`}>
             {isFreelancer
-              ? 'All contracts where you are the freelancer.'
-              : 'All contracts you have created as a client.'}
+              ? 'Contracts are created by Colle AI inside your chats. Apply for a job to get started.'
+              : 'Contracts are drafted by Colle AI inside your chat with a freelancer. Post a job to begin.'}
           </p>
         </div>
+
+        {/* How it works — shown when no contracts yet */}
+        {!loading && contracts.length === 0 && (
+          <div className={`${c.card} border ${c.border} rounded-2xl p-6 mb-8`}>
+            <p className={`text-xs font-bold uppercase tracking-widest ${c.muted} mb-4`}>How Contracts Work on Collectica</p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {(isFreelancer ? [
+                { step: '1', icon: '🔔', title: 'Get notified', desc: 'A client posts a job. You see it on your dashboard.' },
+                { step: '2', icon: '💬', title: 'Chat opens', desc: 'You tap Apply. A chat opens between you and the client with Colle present.' },
+                { step: '3', icon: '🤖', title: 'Colle drafts', desc: 'After discussing scope, say "Colle draft contract" — Colle turns your conversation into a real contract.' },
+                { step: '4', icon: '✍️', title: 'Sign & get paid', desc: 'Both parties sign inside chat. Client funds escrow. You get paid per milestone.' },
+              ] : [
+                { step: '1', icon: '📋', title: 'Post a job', desc: 'Describe what you need. Set a budget range. Upload a brief if you have one.' },
+                { step: '2', icon: '💬', title: 'Freelancer applies', desc: 'A freelancer taps Apply. A chat opens between you both with Colle ready.' },
+                { step: '3', icon: '🤖', title: 'Colle drafts', desc: 'Discuss scope in chat. Say "Colle draft contract" and Colle generates it from your conversation.' },
+                { step: '4', icon: '🔒', title: 'Sign & fund', desc: 'Both sign inside chat. You fund the escrow from your wallet. Freelancer gets paid per milestone.' },
+              ]).map(s => (
+                <div key={s.step} className={`${c.bgMid} border ${c.border} rounded-xl p-4`}>
+                  <div className="text-2xl mb-2">{s.icon}</div>
+                  <p className={`text-xs font-bold ${c.text} mb-1`}>{s.title}</p>
+                  <p className={`text-xs ${c.muted} leading-relaxed`}>{s.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className={`flex gap-5 border-b ${c.border} mb-6 overflow-x-auto`}>
@@ -148,7 +186,7 @@ export default function Contracts() {
           ))}
         </div>
 
-        {/* Content */}
+        {/* Contract list */}
         {loading ? (
           <div className="space-y-3">
             {[1,2,3].map(i => (
@@ -165,47 +203,66 @@ export default function Contracts() {
         ) : filtered.length > 0 ? (
           <div className="space-y-3">
             {filtered.map(ct => {
-              const s = STATUS[ct.status] || STATUS.draft
-              const party = isFreelancer ? ct.client : ct.freelancer
-              const partyName = party?.full_name || 'Unknown'
-              const initials = partyName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
-              const totalMilestones = ct.milestones?.length || 0
-              const doneMilestones  = ct.milestones?.filter(m => m.status === 'approved' || m.status === 'paid').length || 0
-              const progress = totalMilestones > 0 ? Math.round((doneMilestones / totalMilestones) * 100) : 0
+              const s           = STATUS[ct.status] || STATUS.draft
+              const party       = isFreelancer ? ct.client : ct.freelancer
+              const partyName   = party?.full_name || 'Unknown'
+              const initials    = partyName.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+              const total       = ct.milestones?.length || 0
+              const done        = ct.milestones?.filter(m => m.status === 'approved' || m.status === 'paid').length || 0
+              const progress    = total > 0 ? Math.round((done / total) * 100) : 0
+              const chatLink    = ct.chat?.id
+                ? `/messages?contract=${ct.id}`
+                : `/messages`
 
               return (
-                <Link key={ct.id} to={`/messages?contract=${ct.id}`}
+                <Link key={ct.id} to={chatLink}
                   className={`${c.card} border ${c.border} rounded-2xl p-5 flex items-center gap-4 transition-all
                     ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f8f8f8]'} hover:scale-[1.005] block`}>
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className={`w-12 h-12 rounded-xl ${c.bgMid} border ${c.border} flex items-center justify-center font-extrabold text-sm ${c.text} flex-shrink-0`}>
+                    {/* Avatar */}
+                    <div className={`w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center font-extrabold text-sm text-green-500 flex-shrink-0`}>
                       {initials}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                          <p className={`text-sm font-bold ${c.text}`}>{partyName}</p>
-                          <p className={`text-xs ${c.muted}`}>
+                        <div className="min-w-0">
+                          <p className={`text-sm font-bold truncate ${c.text}`}>{partyName}</p>
+                          <p className={`text-xs ${c.muted} truncate`}>
                             {ct.title}
-                            {totalMilestones > 0 && ` · ${totalMilestones} milestone${totalMilestones > 1 ? 's' : ''}`}
+                            {total > 0 && ` · ${total} milestone${total > 1 ? 's' : ''}`}
                             {ct.created_at && ` · ${new Date(ct.created_at).toLocaleDateString()}`}
                           </p>
                         </div>
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${s.bg} ${s.color}`}>
-                          {s.label}
-                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {ct.escrow_funded && (
+                            <span className="flex items-center gap-1 text-xs font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+                              <Lock size={9}/> Funded
+                            </span>
+                          )}
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${s.bg} ${s.color}`}>
+                            {s.label}
+                          </span>
+                        </div>
                       </div>
-                      <div className={`mt-3 h-1.5 rounded-full ${c.bgMid}`}>
-                        <div className="h-1.5 rounded-full bg-green-500 transition-all" style={{ width: `${progress}%` }}/>
-                      </div>
-                      <p className={`text-xs mt-1 ${c.muted}`}>{progress}% complete</p>
+                      {/* Progress bar */}
+                      {total > 0 && (
+                        <>
+                          <div className={`mt-3 h-1.5 rounded-full ${c.bgMid}`}>
+                            <div className="h-1.5 rounded-full bg-green-500 transition-all" style={{ width: `${progress}%` }}/>
+                          </div>
+                          <p className={`text-xs mt-1 ${c.muted}`}>{progress}% complete · {done}/{total} milestones</p>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className={`text-base font-extrabold ${c.text}`}>
                       ₦{ct.total_value?.toLocaleString()}
                     </p>
-                    <ChevronRight size={15} className={`${c.muted} mt-1 ml-auto`}/>
+                    <div className="flex items-center gap-1 justify-end mt-1">
+                      <MessageSquare size={11} className={c.muted}/>
+                      <span className={`text-xs ${c.muted}`}>Open chat</span>
+                    </div>
                   </div>
                 </Link>
               )
@@ -217,15 +274,14 @@ export default function Contracts() {
             <p className={`font-bold text-lg ${c.text} mb-2`}>No contracts yet</p>
             <p className={`text-sm ${c.light} mb-6 max-w-sm mx-auto`}>
               {isFreelancer
-                ? 'When a client creates a contract with you, it will appear here.'
-                : 'Create your first contract to start working with a freelancer.'}
+                ? 'Apply for a job on your dashboard. Once you and a client agree on scope, Colle will generate a contract inside your chat.'
+                : 'Post a job to connect with freelancers. Colle will help you draft a contract from your conversation.'}
             </p>
-            {!isFreelancer && (
-              <Link to="/contracts/new"
-                className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
-                <Plus size={14}/> Create Contract
-              </Link>
-            )}
+            <Link to={isFreelancer ? '/jobs' : '/contracts/new'}
+              className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
+              <Plus size={14}/>
+              {isFreelancer ? 'Browse Jobs' : 'Post a Job'}
+            </Link>
           </div>
         )}
       </main>

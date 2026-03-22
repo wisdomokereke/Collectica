@@ -18,11 +18,11 @@ const CATEGORIES = [
 
 const DURATIONS = [
   { label: 'Less than a week', value: 'less_than_week' },
-  { label: '1–2 weeks', value: '1_2_weeks' },
-  { label: '1 month', value: '1_month' },
-  { label: '2–3 months', value: '2_3_months' },
-  { label: '3–6 months', value: '3_6_months' },
-  { label: 'Ongoing', value: 'ongoing' },
+  { label: '1–2 weeks',        value: '1_2_weeks'      },
+  { label: '1 month',          value: '1_month'         },
+  { label: '2–3 months',       value: '2_3_months'      },
+  { label: '3–6 months',       value: '3_6_months'      },
+  { label: 'Ongoing',          value: 'ongoing'         },
 ]
 
 export default function NewContract() {
@@ -32,29 +32,29 @@ export default function NewContract() {
   const isDark = theme === 'dark'
   const fileRef = useRef(null)
 
-  const [step, setStep] = useState(0)
+  const [step, setStep]         = useState(0)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [brief, setBrief] = useState(null)
-  const [form, setForm] = useState({
+  const [error, setError]       = useState('')
+  const [brief, setBrief]     = useState(null)
+  const [form, setForm]       = useState({
     title: '', description: '', category: '',
     budget_min: '', budget_max: '', deadline: '', duration: '',
     skills_needed: [],
   })
 
   const c = {
-    bg: isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]',
-    card: isDark ? 'bg-[#111]' : 'bg-white',
-    bgMid: isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]',
-    border: isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
-    text: isDark ? 'text-white' : 'text-[#0a0a0a]',
-    muted: isDark ? 'text-[#555]' : 'text-[#aaa]',
-    light: isDark ? 'text-[#888]' : 'text-[#666]',
-    input: isDark
+    bg:      isDark ? 'bg-[#0a0a0a]'     : 'bg-[#f8f8f8]',
+    card:    isDark ? 'bg-[#111]'        : 'bg-white',
+    bgMid:   isDark ? 'bg-[#1a1a1a]'     : 'bg-[#f0f0f0]',
+    border:  isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
+    text:    isDark ? 'text-white'       : 'text-[#0a0a0a]',
+    muted:   isDark ? 'text-[#555]'      : 'text-[#aaa]',
+    light:   isDark ? 'text-[#888]'      : 'text-[#666]',
+    input:   isDark
       ? 'bg-[#1a1a1a] text-white placeholder-[#444] border-[#2e2e2e] focus:border-white'
       : 'bg-white text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0] focus:border-[#0a0a0a]',
-    btn: isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]',
-    btnGhost: isDark ? 'border-[#2e2e2e] text-[#888] hover:text-white' : 'border-[#e0e0e0] text-[#666] hover:text-[#0a0a0a]',
+    btn:     isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]',
+    btnGhost:isDark ? 'border-[#2e2e2e] text-[#888] hover:text-white' : 'border-[#e0e0e0] text-[#666] hover:text-[#0a0a0a]',
   }
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }))
@@ -83,38 +83,48 @@ export default function NewContract() {
     setError('')
     setSubmitting(true)
     try {
-      let brief_url = null
+      let brief_url  = null
       let brief_name = null
 
-      // Upload brief if provided
+      // Upload brief if provided — skip silently if bucket doesn't exist
       if (brief) {
-        const path = `${user.id}/${Date.now()}-${brief.name}`
-        const { error: uploadError } = await supabase.storage
-          .from('briefs')
-          .upload(path, brief, { upsert: false })
-        if (!uploadError) {
-          const { data } = supabase.storage.from('briefs').getPublicUrl(path)
-          brief_url = data.publicUrl
-          brief_name = brief.name
+        try {
+          const path = `${user.id}/${Date.now()}-${brief.name}`
+          const { error: uploadError } = await supabase.storage
+            .from('briefs')
+            .upload(path, brief, { upsert: false })
+          if (!uploadError) {
+            const { data } = supabase.storage.from('briefs').getPublicUrl(path)
+            brief_url  = data.publicUrl
+            brief_name = brief.name
+          }
+        } catch {
+          // Brief upload failed — continue without it
         }
       }
 
-      // Create job in Supabase
+      // Build job object — only include columns that exist
+      const jobData = {
+        client_id:   user.id,
+        title:       form.title.trim(),
+        description: form.description.trim(),
+        category:    form.category,
+        budget_min:  parseFloat(form.budget_min),
+        budget_max:  parseFloat(form.budget_max),
+        deadline:    form.deadline || null,
+        status:      'open',
+      }
+
+      // Add optional columns if they have values
+      if (brief_url)  jobData.brief_url  = brief_url
+      if (brief_name) jobData.brief_name = brief_name
+      if (form.skills_needed.length > 0) {
+        try { jobData.skills_needed = form.skills_needed } catch {}
+      }
+
       const { data: job, error: jobError } = await supabase
         .from('jobs')
-        .insert({
-          client_id: user.id,
-          title: form.title.trim(),
-          description: form.description.trim(),
-          category: form.category,
-          budget_min: parseFloat(form.budget_min),
-          budget_max: parseFloat(form.budget_max),
-          deadline: form.deadline || null,
-          status: 'open',
-          brief_url,
-          brief_name,
-          skills_needed: form.skills_needed.length > 0 ? form.skills_needed : null,
-        })
+        .insert(jobData)
         .select()
         .single()
 
@@ -122,6 +132,7 @@ export default function NewContract() {
 
       setStep(2)
     } catch (err) {
+      console.error('Post job error:', err)
       setError(err.message || 'Failed to post job. Please try again.')
     } finally {
       setSubmitting(false)
@@ -142,11 +153,11 @@ export default function NewContract() {
       <header className={`sticky top-0 z-20 flex items-center justify-between px-6 md:px-10 py-4 border-b ${c.border} ${c.card}`}>
         <div className="flex items-center gap-4">
           <Link to="/dashboard" className={`flex items-center gap-2 text-sm font-semibold ${c.light}`}>
-            <ArrowLeft size={15} /> Dashboard
+            <ArrowLeft size={15}/> Dashboard
           </Link>
-          <div className={`w-px h-4 ${isDark ? 'bg-[#2e2e2e]' : 'bg-[#e0e0e0]'}`} />
+          <div className={`w-px h-4 ${isDark ? 'bg-[#2e2e2e]' : 'bg-[#e0e0e0]'}`}/>
           <div className="flex items-center gap-2">
-            <Briefcase size={15} className={c.muted} />
+            <Briefcase size={15} className={c.muted}/>
             <span className={`text-sm font-bold ${c.text}`}>Post a Job</span>
           </div>
         </div>
@@ -158,11 +169,11 @@ export default function NewContract() {
                 <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all
                   ${i < step ? 'bg-green-500 text-white'
                     : i === step ? isDark ? 'bg-white text-[#0a0a0a]' : 'bg-[#0a0a0a] text-white'
-                      : `${c.bgMid} ${c.muted}`}`}>
-                  {i < step ? <CheckCircle size={12} /> : i + 1}
+                    : `${c.bgMid} ${c.muted}`}`}>
+                  {i < step ? <CheckCircle size={12}/> : i + 1}
                 </div>
                 <span className={`text-xs font-medium hidden sm:block ${i === step ? c.text : c.muted}`}>{s}</span>
-                {i < 1 && <div className={`w-6 h-px ${i < step ? 'bg-green-500' : c.border}`} />}
+                {i < 1 && <div className={`w-6 h-px ${i < step ? 'bg-green-500' : c.border}`}/>}
               </div>
             ))}
           </div>
@@ -194,7 +205,7 @@ export default function NewContract() {
               </label>
               <input type="text" placeholder="e.g. Brand Identity Design for Fintech Startup"
                 value={form.title} onChange={e => set('title', e.target.value)}
-                className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`} />
+                className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
             </div>
 
             {/* Description */}
@@ -205,7 +216,7 @@ export default function NewContract() {
               <textarea placeholder="Describe what you need done. Be specific — the clearer your brief, the better the proposals you'll receive."
                 value={form.description} onChange={e => set('description', e.target.value)}
                 rows={5}
-                className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all resize-none ${c.input}`} />
+                className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all resize-none ${c.input}`}/>
             </div>
 
             {/* Category */}
@@ -234,14 +245,14 @@ export default function NewContract() {
               <div className="flex flex-wrap gap-2">
                 {['Figma', 'React', 'Node.js', 'Adobe Illustrator', 'Premiere Pro', 'Copywriting',
                   'WordPress', 'Python', 'Branding', 'Motion Graphics', 'Photography', 'SEO'].map(skill => (
-                    <button key={skill} onClick={() => toggleSkill(skill)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
+                  <button key={skill} onClick={() => toggleSkill(skill)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
                       ${form.skills_needed.includes(skill)
-                          ? 'bg-green-500/20 text-green-500 border-green-500/40'
-                          : `${c.border} ${c.light}`}`}>
-                      {skill}
-                    </button>
-                  ))}
+                        ? 'bg-green-500/20 text-green-500 border-green-500/40'
+                        : `${c.border} ${c.light}`}`}>
+                    {skill}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -255,14 +266,14 @@ export default function NewContract() {
                   <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold ${c.muted}`}>₦</span>
                   <input type="number" placeholder="Min" value={form.budget_min}
                     onChange={e => set('budget_min', e.target.value)}
-                    className={`w-full pl-8 pr-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`} />
+                    className={`w-full pl-8 pr-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
                 </div>
                 <span className={`text-sm font-bold ${c.muted}`}>–</span>
                 <div className="relative flex-1">
                   <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold ${c.muted}`}>₦</span>
                   <input type="number" placeholder="Max" value={form.budget_max}
                     onChange={e => set('budget_max', e.target.value)}
-                    className={`w-full pl-8 pr-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`} />
+                    className={`w-full pl-8 pr-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
                 </div>
               </div>
               <p className={`text-xs mt-2 ${c.muted}`}>
@@ -295,7 +306,7 @@ export default function NewContract() {
                 <input type="date" value={form.deadline}
                   onChange={e => set('deadline', e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`} />
+                  className={`w-full px-4 py-3.5 rounded-xl border text-sm outline-none transition-all ${c.input}`}/>
               </div>
             </div>
 
@@ -305,23 +316,23 @@ export default function NewContract() {
                 Attach Brief <span className={c.muted}>(optional — PDF, Word, or image)</span>
               </label>
               <input ref={fileRef} type="file" className="hidden"
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={handleBrief} />
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={handleBrief}/>
               {brief ? (
                 <div className={`flex items-center gap-3 p-4 rounded-xl border ${c.border} ${c.bgMid}`}>
-                  <File size={16} className="text-green-500 flex-shrink-0" />
+                  <File size={16} className="text-green-500 flex-shrink-0"/>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-bold truncate ${c.text}`}>{brief.name}</p>
-                    <p className={`text-xs ${c.muted}`}>{(brief.size / 1024 / 1024).toFixed(1)} MB</p>
+                    <p className={`text-xs ${c.muted}`}>{(brief.size/1024/1024).toFixed(1)} MB</p>
                   </div>
                   <button onClick={() => setBrief(null)} className={c.muted}>
-                    <X size={15} />
+                    <X size={15}/>
                   </button>
                 </div>
               ) : (
                 <button onClick={() => fileRef.current?.click()}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 border-dashed ${c.border} transition-all
                     ${isDark ? 'hover:border-[#555]' : 'hover:border-[#aaa]'}`}>
-                  <Upload size={16} className={c.muted} />
+                  <Upload size={16} className={c.muted}/>
                   <p className={`text-sm ${c.light}`}>Click to upload your brief or project document</p>
                 </button>
               )}
@@ -333,7 +344,7 @@ export default function NewContract() {
             <button onClick={() => { if (canPost()) setStep(1) }}
               disabled={!canPost()}
               className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-40 ${c.btn}`}>
-              <ArrowRight size={15} /> Preview Job Post
+              <ArrowRight size={15}/> Preview Job Post
             </button>
           </div>
         )}
@@ -345,6 +356,12 @@ export default function NewContract() {
               <h1 className={`text-3xl font-extrabold tracking-tight ${c.text}`}>Preview</h1>
               <p className={`text-sm ${c.light} mt-1`}>This is what freelancers will see.</p>
             </div>
+
+            {error && (
+              <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {error}
+              </div>
+            )}
 
             {/* Job card preview */}
             <div className={`${c.card} border ${c.border} rounded-2xl overflow-hidden`}>
@@ -379,7 +396,7 @@ export default function NewContract() {
                 )}
                 {brief && (
                   <div className={`flex items-center gap-2 p-3 rounded-xl ${c.bgMid} border ${c.border}`}>
-                    <File size={13} className="text-green-500" />
+                    <File size={13} className="text-green-500"/>
                     <span className={`text-xs font-semibold ${c.text}`}>{brief.name}</span>
                     <span className={`text-xs ${c.muted} ml-auto`}>Brief attached</span>
                   </div>
@@ -394,7 +411,7 @@ export default function NewContract() {
 
             {/* Escrow note */}
             <div className="flex items-start gap-3 p-4 rounded-xl bg-green-500/5 border border-green-500/20">
-              <Shield size={14} className="text-green-500 mt-0.5 flex-shrink-0" />
+              <Shield size={14} className="text-green-500 mt-0.5 flex-shrink-0"/>
               <div>
                 <p className="text-xs font-bold text-green-500">How this works</p>
                 <p className={`text-xs ${c.light} mt-1 leading-relaxed`}>
@@ -407,8 +424,8 @@ export default function NewContract() {
               <button onClick={handlePost} disabled={submitting}
                 className={`flex-1 py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${c.btn}`}>
                 {submitting
-                  ? <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> Posting...</>
-                  : <><Briefcase size={15} /> Post Job to All Freelancers</>}
+                  ? <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> Posting...</>
+                  : <><Briefcase size={15}/> Post Job to All Freelancers</>}
               </button>
               <button onClick={() => setStep(0)}
                 className={`px-5 py-4 rounded-xl border font-semibold text-sm transition-all ${c.btnGhost}`}>

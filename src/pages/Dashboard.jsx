@@ -78,7 +78,6 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
       setApplying(false)
     }
   }
-  }
 
   return (
     <button onClick={handleApply} disabled={applying || applied}

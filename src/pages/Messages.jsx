@@ -811,8 +811,6 @@ Be concise, warm, and helpful. You protect both parties.`,
             </div>
           </div>
         )}
-        </div>
-
         {/* Scam warning */}
         {scamFlag && (
           <div className="mx-4 mb-3 flex items-start gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10">

@@ -6,8 +6,7 @@ import {
   ChevronRight, Loader2, Bot, Briefcase, Bell, Plus,
   CheckCircle, Clock, DollarSign, ChevronDown, ChevronUp,
   Circle, AlertCircle, XCircle
-} from 'lucide-react'
-import { useTheme } from '../lib/ThemeContext'
+} from 'lucide-react'import { useTheme } from '../lib/ThemeContext'
 import { useAuth, ROLES } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -52,7 +51,7 @@ const MS_STATUS = {
 }
 
 // ── Message bubble ─────────────────────────────────────────
-function MsgBubble({ msg, isDark, c, myId }) {
+function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
   const isMe = msg.sender_id === myId
 
   if (msg.type === 'system') return (
@@ -78,6 +77,88 @@ function MsgBubble({ msg, isDark, c, myId }) {
       </div>
     </div>
   )
+
+  if (msg.type === 'contract_draft') {
+    const meta = msg.metadata || {}
+    const ct   = meta.contract || {}
+    const signedClient     = meta.signed_client
+    const signedFreelancer = meta.signed_freelancer
+    const bothSigned       = signedClient && signedFreelancer
+    const amClient         = myId === meta.client_id
+    const amFreelancer     = myId === meta.freelancer_id
+    const iSigned          = amClient ? signedClient : signedFreelancer
+    const onSign           = onSignContract ? () => onSignContract(msg) : null
+
+    return (
+      <div className="flex justify-center my-4 px-2">
+        <div className={`w-full max-w-sm rounded-2xl border-2 overflow-hidden
+          ${bothSigned ? 'border-green-500/40 bg-green-500/5' : 'border-blue-500/30 bg-blue-500/5'}`}>
+          <div className={`flex items-center gap-2 px-4 py-3 border-b ${bothSigned ? 'border-green-500/20' : 'border-blue-500/20'}`}>
+            <Bot size={12} className={bothSigned ? 'text-green-500' : 'text-blue-400'}/>
+            <span className={`text-xs font-bold ${bothSigned ? 'text-green-500' : 'text-blue-400'}`}>
+              {bothSigned ? '✅ Contract Active' : '📄 Contract Draft — Ready to Sign'}
+            </span>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-[#0a0a0a]'}`}>{ct.title}</p>
+              <p className={`text-xs ${c.muted} mt-0.5 leading-relaxed line-clamp-3`}>{ct.scope}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs ${c.muted}`}>Total Value</span>
+              <span className="text-sm font-extrabold text-green-500">
+                ₦{ct.total_value?.toLocaleString()}
+              </span>
+            </div>
+            {ct.milestones?.length > 0 && (
+              <div className="space-y-1.5">
+                <p className={`text-xs font-bold ${c.muted}`}>{ct.milestones.length} Milestones</p>
+                {ct.milestones.map((m, i) => (
+                  <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'}`}>
+                    <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-[#0a0a0a]'} truncate flex-1 mr-2`}>{m.title}</p>
+                    <p className="text-xs font-bold text-green-500">₦{m.amount?.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Signature status */}
+            <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]'}`}>
+              {[
+                { label: 'Client',     signed: signedClient     },
+                { label: 'Freelancer', signed: signedFreelancer },
+              ].map(p => (
+                <div key={p.label} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg ${p.signed ? 'bg-green-500/10' : isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'}`}>
+                  {p.signed
+                    ? <CheckCircle size={11} className="text-green-500"/>
+                    : <Clock size={11} className="text-orange-500"/>}
+                  <span className={`text-xs font-bold ${p.signed ? 'text-green-500' : c.muted}`}>
+                    {p.label} {p.signed ? '✓' : '...'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {/* Sign button */}
+            {!bothSigned && !iSigned && onSign && (
+              <button onClick={onSign}
+                className="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center justify-center gap-1.5">
+                <Shield size={12}/> Sign This Contract
+              </button>
+            )}
+            {!bothSigned && iSigned && (
+              <p className="text-center text-xs text-green-500 font-bold py-1">
+                ✓ You signed — waiting for the other party
+              </p>
+            )}
+            {bothSigned && (
+              <p className="text-center text-xs text-green-500 font-bold py-1">
+                ✅ Both parties signed — contract is live!
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (msg.type === 'file') return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-3 px-2`}>
@@ -309,6 +390,8 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
   const [colleActive, setColleActive] = useState(false)
   const [showPanel, setShowPanel]   = useState(false)
   const [loading, setLoading]       = useState(true)
+  const [signingPin, setSigningPin] = useState('')
+  const [signingMsgId, setSigningMsgId] = useState(null)
   const bottomRef = useRef(null)
   const fileRef   = useRef(null)
 
@@ -379,32 +462,184 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
       chat_id: chat.id, sender_id: null,
       content: `${displayName} summoned Colle...`, type: 'system',
     })
-    const history = msgs.filter(m => m.type === 'text')
+
+    const history = msgs
+      .filter(m => m.type === 'text')
       .map(m => `${m.sender_id === myId ? displayName : partyName}: ${m.content}`)
       .join('\n')
-    const prompt = `${userMessage.length > 6 ? `The user asked: "${userMessage}"\n\n` : ''}Conversation so far:\n${history || 'No messages yet.'}`
+
+    let jobContext = ''
+    if (chat.job) {
+      jobContext = `\nJob: ${chat.job.title}\nBudget: ₦${chat.job.budget_min?.toLocaleString()} – ₦${chat.job.budget_max?.toLocaleString()}`
+      if (chat.job.description) jobContext += `\nDescription: ${chat.job.description}`
+      if (chat.job.brief_name) jobContext += `\nBrief attached: ${chat.job.brief_name}`
+    }
+
+    // Detect if user wants a contract drafted
+    const wantsDraft = /draft|contract|set up|create contract|write contract|scope|agree|deal|milestone/i.test(userMessage)
+
+    const prompt = `${userMessage.length > 6 ? `The user said: "${userMessage}"\n\n` : ''}${jobContext ? `Job Context:${jobContext}\n\n` : ''}Conversation:\n${history || 'No messages yet.'}`
+
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-          system: `You are Colle, the AI legal assistant built into Collectica — a contract-first freelance platform for Africa. You are present in every chat between a client and freelancer. Help them draft contracts, define milestones, set payment terms, and protect both parties from disputes. Be concise and professional. If asked to draft a contract, extract key terms from the conversation clearly. Always remind users funds are held in escrow.`,
-          messages: [{ role: 'user', content: prompt }]
+      if (wantsDraft) {
+        // Ask Colle to return structured contract JSON
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+            system: `You are Colle, the AI legal assistant for Collectica. Extract a contract from the conversation and return ONLY valid JSON with this exact structure:
+{
+  "title": "contract title",
+  "scope": "full scope of work description",
+  "total_value": 150000,
+  "currency": "NGN",
+  "milestones": [
+    { "title": "milestone name", "description": "what is delivered", "amount": 50000, "order_index": 1 }
+  ],
+  "summary": "one sentence summary for both parties"
+}
+Use the budget range from the job context. Split payment across milestones sensibly. Return ONLY the JSON, no other text.`,
+            messages: [{ role: 'user', content: prompt }]
+          })
         })
-      })
-      const data = await res.json()
-      const text = data.content?.[0]?.text || 'I could not process that right now. Please try again.'
-      await supabase.from('messages').insert({
-        chat_id: chat.id, sender_id: null, content: text, type: 'colle',
-      })
+        const data = await res.json()
+        const raw  = data.content?.[0]?.text || ''
+        try {
+          const contractData = JSON.parse(raw.replace(/```json|```/g, '').trim())
+          // Insert as contract_draft message type with metadata
+          await supabase.from('messages').insert({
+            chat_id:   chat.id,
+            sender_id: null,
+            content:   contractData.summary || 'Contract draft ready for review.',
+            type:      'contract_draft',
+            metadata:  {
+              contract:         contractData,
+              signed_client:    false,
+              signed_freelancer:false,
+              client_id:        chat.client_id,
+              freelancer_id:    chat.freelancer_id,
+            },
+          })
+        } catch {
+          // Fallback to regular Colle message if JSON parse fails
+          await supabase.from('messages').insert({
+            chat_id: chat.id, sender_id: null, content: raw, type: 'colle',
+          })
+        }
+      } else {
+        // Regular Colle response
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+            system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. When they're ready to formalise, tell them to type "Colle draft contract" to generate a signable contract. Be concise and friendly.`,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        })
+        const data = await res.json()
+        const text = data.content?.[0]?.text || 'I could not process that. Please try again.'
+        await supabase.from('messages').insert({
+          chat_id: chat.id, sender_id: null, content: text, type: 'colle',
+        })
+      }
     } catch {
       await supabase.from('messages').insert({
         chat_id: chat.id, sender_id: null,
-        content: 'Having trouble connecting. Please try again.',
+        content: 'Having trouble connecting right now. Please try again.',
         type: 'colle',
       })
     } finally { setAiLoading(false) }
+  }
+
+  const signContract = async (msg) => {
+    const [pin, setPin] = [signingPin, setSigningPin]
+    if (!pin || pin.length < 4) { alert('Enter your signing password to sign'); return }
+
+    // Verify signing password
+    const { data: userData } = await supabase
+      .from('users')
+      .select('signing_password')
+      .eq('id', myId)
+      .single()
+
+    if (userData?.signing_password && userData.signing_password !== pin) {
+      alert('Incorrect signing password'); return
+    }
+
+    const isClient      = myId === chat.client_id
+    const newMeta       = { ...msg.metadata }
+    if (isClient) newMeta.signed_client = true
+    else          newMeta.signed_freelancer = true
+
+    // Update message metadata
+    await supabase.from('messages')
+      .update({ metadata: newMeta })
+      .eq('id', msg.id)
+
+    // If both signed — create the real contract
+    if (newMeta.signed_client && newMeta.signed_freelancer) {
+      const ct = newMeta.contract
+      const { data: contract } = await supabase
+        .from('contracts')
+        .insert({
+          chat_id:          chat.id,
+          job_id:           chat.job_id,
+          client_id:        chat.client_id,
+          freelancer_id:    chat.freelancer_id,
+          title:            ct.title,
+          scope:            ct.scope,
+          total_value:      ct.total_value,
+          currency:         ct.currency || 'NGN',
+          status:           'pending_signatures',
+          version:          1,
+          signed_client:    true,
+          signed_client_at: new Date().toISOString(),
+          signed_freelancer:true,
+          signed_freelancer_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (contract) {
+        // Create milestones
+        if (ct.milestones?.length > 0) {
+          await supabase.from('milestones').insert(
+            ct.milestones.map(m => ({
+              contract_id:  contract.id,
+              title:        m.title,
+              description:  m.description,
+              amount:       m.amount,
+              order_index:  m.order_index,
+              max_revisions:2,
+            }))
+          )
+        }
+
+        // Link contract to chat
+        await supabase.from('chats')
+          .update({ contract_id: contract.id })
+          .eq('id', chat.id)
+
+        // Colle announces and asks for escrow funding
+        await supabase.from('messages').insert({
+          chat_id: chat.id, sender_id: null,
+          content: `✅ Both parties have signed! The contract "${ct.title}" is now active.\n\n💰 Next step: ${chat.client?.full_name || 'Client'}, please fund the escrow from your wallet so the freelancer can begin work. Go to Wallet → Fund Contract.`,
+          type: 'colle',
+        })
+      }
+    } else {
+      // One party signed — notify
+      const who = isClient ? 'Client' : 'Freelancer'
+      await supabase.from('messages').insert({
+        chat_id: chat.id, sender_id: null,
+        content: `✍️ ${who} has signed. Waiting for the ${isClient ? 'freelancer' : 'client'} to sign before the contract is activated.`,
+        type: 'system',
+      })
+    }
+    setSigningPin('')
+    setSigningMsgId(null)
   }
 
   return (
@@ -455,12 +690,44 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
               <div>
                 <p className={`font-bold ${c.text}`}>Start the conversation</p>
                 <p className={`text-xs ${c.muted} mt-1`}>
-                  Type <span className="text-green-500 font-bold">Colle</span> to get AI help drafting your contract.
+                  Type <span className="text-green-500 font-bold">Colle draft contract</span> when ready to formalise your agreement.
                 </p>
               </div>
             </div>
-          ) : msgs.map(m => <MsgBubble key={m.id} msg={m} isDark={isDark} c={c} myId={myId}/>)}
+          ) : msgs.map(m => (
+            <MsgBubble
+              key={m.id} msg={m} isDark={isDark} c={c} myId={myId}
+              onSignContract={m.type === 'contract_draft' ? () => setSigningMsgId(m.id) : null}
+            />
+          ))}
           <div ref={bottomRef}/>
+        </div>
+
+        {/* Signing PIN modal */}
+        {signingMsgId && (
+          <div className={`mx-4 mb-3 p-4 rounded-xl border ${isDark ? 'border-blue-500/30 bg-blue-500/5' : 'border-blue-500/20 bg-blue-500/5'}`}>
+            <p className={`text-xs font-bold text-blue-400 mb-2`}>✍️ Enter your signing password to sign</p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="Your signing password"
+                value={signingPin}
+                onChange={e => setSigningPin(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { const msg = msgs.find(m => m.id === signingMsgId); if (msg) signContract(msg) }}}
+                className={`flex-1 px-3 py-2 rounded-lg border text-xs outline-none ${isDark ? 'bg-[#1a1a1a] text-white border-[#2e2e2e] placeholder-[#444]' : 'bg-white text-[#0a0a0a] border-[#e0e0e0] placeholder-[#bbb]'}`}
+              />
+              <button
+                onClick={() => { const msg = msgs.find(m => m.id === signingMsgId); if (msg) signContract(msg) }}
+                className="px-3 py-2 rounded-lg bg-blue-500 text-white text-xs font-bold hover:bg-blue-600">
+                Sign
+              </button>
+              <button onClick={() => { setSigningMsgId(null); setSigningPin('') }}
+                className={`px-3 py-2 rounded-lg text-xs font-bold ${c.bgMid} ${c.light}`}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         </div>
 
         {/* Scam warning */}
@@ -732,7 +999,7 @@ export default function Messages() {
         client:users!chats_client_id_fkey(id, full_name, trust_score),
         freelancer:users!chats_freelancer_id_fkey(id, full_name, trust_score),
         contract:contracts(id, title, status, total_value),
-        job:jobs(id, title, budget_min, budget_max)
+        job:jobs(id, title, budget_min, budget_max, description, brief_url, brief_name, client_id)
       `)
       .or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`)
       .order('created_at', { ascending: false })

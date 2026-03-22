@@ -4,8 +4,81 @@ import {
   LayoutDashboard, FileText, Shield, Wallet, LogOut,
   MessageSquare, TrendingUp, Clock, CheckCircle, Plus,
   Menu, Briefcase, User, ArrowUpRight, Star, Search,
-  MapPin, DollarSign, Calendar, ChevronRight, Bell
+  MapPin, DollarSign, Calendar, ChevronRight, Bell, Send
 } from 'lucide-react'
+
+// ── Apply button — creates chat then navigates to messages ──
+function ApplyButton({ job, userId, navigate, c, isDark }) {
+  const [applying, setApplying] = useState(false)
+  const [applied, setApplied]   = useState(false)
+
+  const handleApply = async () => {
+    setApplying(true)
+    try {
+      // Check if already applied
+      const { data: existing } = await supabase
+        .from('job_applications')
+        .select('id, chat_id')
+        .eq('job_id', job.id)
+        .eq('freelancer_id', userId)
+        .single()
+
+      if (existing) {
+        // Already applied — go straight to chat
+        navigate(`/messages?job=${job.id}`)
+        return
+      }
+
+      // Create chat between freelancer and client
+      const { data: chat, error: chatErr } = await supabase
+        .from('chats')
+        .insert({
+          job_id:        job.id,
+          client_id:     job.client_id,
+          freelancer_id: userId,
+        })
+        .select()
+        .single()
+
+      if (chatErr) throw chatErr
+
+      // Record application
+      await supabase.from('job_applications').insert({
+        job_id:       job.id,
+        freelancer_id: userId,
+        chat_id:      chat.id,
+        status:       'pending',
+      })
+
+      // Send opening system message from Colle
+      await supabase.from('messages').insert({
+        chat_id:   chat.id,
+        sender_id: null,
+        content:   `👋 A freelancer has applied for "${job.title}". Both parties are now connected. Type Colle at any time for AI contract assistance.`,
+        type:      'system',
+      })
+
+      setApplied(true)
+      navigate(`/messages?job=${job.id}`)
+    } catch (err) {
+      console.error('Apply error:', err)
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  return (
+    <button onClick={handleApply} disabled={applying || applied}
+      className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-60
+        flex items-center gap-1.5
+        ${isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]'}`}>
+      {applying
+        ? <><div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"/> Applying...</>
+        : applied ? '✓ Applied'
+        : <><Send size={11}/> Apply</>}
+    </button>
+  )
+}
 import { useTheme } from '../lib/ThemeContext'
 import { useAuth, ROLES } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -73,6 +146,7 @@ export default function Dashboard() {
   const [contracts, setContracts]     = useState([])
   const [activity, setActivity]       = useState([])
   const [jobs, setJobs]               = useState([])
+  const [postedJobs, setPostedJobs]   = useState([])
   const [stats, setStats]             = useState(null)
   const [loadingData, setLoadingData] = useState(true)
   const [jobSearch, setJobSearch]     = useState('')
@@ -106,7 +180,7 @@ export default function Dashboard() {
   const loadAll = async () => {
     if (!user) return
     setLoadingData(true)
-    await Promise.all([fetchContracts(), fetchActivity(), fetchStats(), isFreelancer ? fetchJobs() : Promise.resolve()])
+    await Promise.all([fetchContracts(), fetchActivity(), fetchStats(), isFreelancer ? fetchJobs() : fetchPostedJobs()])
     setLoadingData(false)
   }
 
@@ -157,6 +231,16 @@ export default function Dashboard() {
       .order('created_at', { ascending: false })
       .limit(20)
     if (data) setJobs(data)
+  }
+
+  const fetchPostedJobs = async () => {
+    const { data } = await supabase
+      .from('jobs')
+      .select('*, job_applications(id)')
+      .eq('client_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (data) setPostedJobs(data)
   }
 
   if (!user) return null
@@ -384,10 +468,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                    <Link to={`/messages?job=${job.id}`}
-                      className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${c.btn}`}>
-                      Apply
-                    </Link>
+                    <ApplyButton job={job} userId={user.id} navigate={navigate} c={c} isDark={isDark}/>
                   </div>
                 </div>
               ))}
@@ -463,6 +544,52 @@ export default function Dashboard() {
           </Link>
         )}
 
+        {/* Posted jobs */}
+        <div className={`${c.card} border ${c.border} rounded-2xl overflow-hidden`}>
+          <div className={`flex items-center justify-between px-6 py-4 border-b ${c.border}`}>
+            <p className={`text-sm font-bold ${c.text}`}>Your Posted Jobs</p>
+            <Link to="/contracts/new" className="text-xs font-bold text-green-500 hover:underline flex items-center gap-1">
+              <Plus size={11}/> Post New
+            </Link>
+          </div>
+          {loadingData ? (
+            <div className="px-6 py-8 flex justify-center">
+              <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : postedJobs.length > 0 ? (
+            <div className="divide-y" style={{ borderColor: isDark ? '#2e2e2e' : '#e0e0e0' }}>
+              {postedJobs.map(job => (
+                <div key={job.id} className={`flex items-center gap-4 px-6 py-4 ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f8f8f8]'} transition-colors`}>
+                  <div className={`w-10 h-10 rounded-xl ${c.bgMid} border ${c.border} flex items-center justify-center flex-shrink-0`}>
+                    <Briefcase size={15} className={c.muted}/>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${c.text}`}>{job.title}</p>
+                    <p className={`text-xs ${c.muted}`}>
+                      {job.category} · {job.job_applications?.length || 0} applicant{job.job_applications?.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-xs font-bold ${c.text}`}>₦{job.budget_min?.toLocaleString()} – ₦{job.budget_max?.toLocaleString()}</p>
+                    <span className={`text-xs font-bold ${job.status === 'open' ? 'text-green-500' : c.muted}`}>
+                      {job.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="px-6 py-10 text-center">
+              <p className={`text-sm font-bold ${c.text}`}>No jobs posted yet</p>
+              <p className={`text-xs ${c.muted} mt-1 mb-4`}>Post a job to start receiving proposals from freelancers.</p>
+              <Link to="/contracts/new"
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
+                <Plus size={13}/> Post a Job
+              </Link>
+            </div>
+          )}
+        </div>
+
         {/* Active contracts */}
         <div className={`${c.card} border ${c.border} rounded-2xl overflow-hidden`}>
           <div className={`flex items-center justify-between px-6 py-4 border-b ${c.border}`}>
@@ -509,7 +636,7 @@ export default function Dashboard() {
               <p className={`text-sm font-bold ${c.text}`}>No active contracts yet</p>
               <p className={`text-xs ${c.muted} mt-1 mb-4`}>Create your first contract to get started.</p>
               <Link to="/contracts/new" className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${c.btn}`}>
-                <Plus size={13}/> New Contract
+                <Plus size={13}/> Post a Job
               </Link>
             </div>
           )}

@@ -32,9 +32,9 @@ export default function NewContract() {
   const isDark = theme === 'dark'
   const fileRef = useRef(null)
 
-  const [step, setStep]       = useState(0) // 0=details, 1=preview, 2=posted
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
+  const [step, setStep]         = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError]       = useState('')
   const [brief, setBrief]     = useState(null)
   const [form, setForm]       = useState({
     title: '', description: '', category: '',
@@ -81,7 +81,7 @@ export default function NewContract() {
 
   const handlePost = async () => {
     setError('')
-    setLoading(true)
+    setSubmitting(true)
     try {
       let brief_url  = null
       let brief_name = null
@@ -124,7 +124,7 @@ export default function NewContract() {
     } catch (err) {
       setError(err.message || 'Failed to post job. Please try again.')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -404,9 +404,9 @@ export default function NewContract() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handlePost} disabled={loading}
+              <button onClick={handlePost} disabled={submitting}
                 className={`flex-1 py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${c.btn}`}>
-                {loading
+                {submitting
                   ? <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> Posting...</>
                   : <><Briefcase size={15}/> Post Job to All Freelancers</>}
               </button>

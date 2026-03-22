@@ -6,7 +6,8 @@ import {
   ChevronRight, Loader2, Bot, Briefcase, Bell, Plus,
   CheckCircle, Clock, DollarSign, ChevronDown, ChevronUp,
   Circle, AlertCircle, XCircle
-} from 'lucide-react'import { useTheme } from '../lib/ThemeContext'
+} from 'lucide-react'
+import { useTheme } from '../lib/ThemeContext'
 import { useAuth, ROLES } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 

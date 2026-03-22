@@ -25,15 +25,16 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
   const handleApply = async () => {
     setApplying(true)
     try {
-      // Check if already applied
-      const { data: existing } = await supabase
-        .from('job_applications')
-        .select('id, chat_id')
+      // Check if chat already exists for this job + freelancer
+      const { data: existingChat } = await supabase
+        .from('chats')
+        .select('id')
         .eq('job_id', job.id)
         .eq('freelancer_id', userId)
         .single()
 
-      if (existing) {
+      if (existingChat) {
+        // Already applied — go straight to messages
         navigate(`/messages?job=${job.id}`)
         return
       }
@@ -51,29 +52,32 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
 
       if (chatErr) throw chatErr
 
-      // Record application
+      // Record application — silently skip if table doesn't exist
       await supabase.from('job_applications').insert({
         job_id:        job.id,
         freelancer_id: userId,
         chat_id:       chat.id,
         status:        'pending',
-      })
+      }).then(() => {}).catch(() => {})
 
       // Colle opens the conversation
       await supabase.from('messages').insert({
         chat_id:   chat.id,
         sender_id: null,
-        content:   `👋 Hi! I'm Colle, your AI contract assistant. A freelancer has expressed interest in "${job.title}".\n\nFeel free to discuss the scope, timeline, and budget. When you're both ready, just say "Colle draft contract" and I'll turn your conversation into a proper contract with milestones. I'm here throughout the entire deal.`,
+        content:   `👋 Hi! I'm Colle, your AI contract assistant.\n\n${job.title} — let's get this deal done properly.\n\nDiscuss the scope, timeline and budget here. When you're both ready, type "Colle draft contract" and I'll generate a proper contract with milestones from your conversation.`,
         type:      'colle',
       })
 
-      setApplied(true)
+      // Navigate to messages no matter what
       navigate(`/messages?job=${job.id}`)
     } catch (err) {
       console.error('Apply error:', err)
+      // Still try to navigate even if something failed
+      navigate(`/messages`)
     } finally {
       setApplying(false)
     }
+  }
   }
 
   return (

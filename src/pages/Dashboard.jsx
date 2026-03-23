@@ -34,7 +34,7 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
         .select('id')
         .eq('job_id', job.id)
         .eq('freelancer_id', userId)
-        .single()
+        .maybeSingle()
 
       if (existingChat) {
         // Already applied — go straight to messages

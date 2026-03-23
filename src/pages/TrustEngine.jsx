@@ -53,7 +53,7 @@ function joinedAgo(dateStr) {
 }
 
 // ── Detail modal ───────────────────────────────────────────
-function ProfileModal({ profile, onClose, isDark, c, isFreelancer }) {
+function ProfileModal({ profile, onClose, isDark, c, isFreelancer, user }) {
   const [contracts, setContracts]     = useState([])
   const [trustEvents, setTrustEvents] = useState([])
   const [loadingDetail, setLoadingDetail] = useState(true)
@@ -281,11 +281,57 @@ function ProfileModal({ profile, onClose, isDark, c, isFreelancer }) {
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               {level === 'trusted' ? (
-                <Link to="/contracts/new"
-                  className={`flex-1 py-3 rounded-xl font-bold text-sm text-center transition-all
-                    ${isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]'}`}>
-                  {isFreelancer ? '💬 Start a Conversation' : '📄 Create Contract'}
-                </Link>
+                isFreelancer ? (
+                  <button
+                    onClick={async () => {
+                      // Find if a direct chat already exists with this user
+                      const { data: existing } = await supabase
+                        .from('chats')
+                        .select('id, job_id')
+                        .eq('client_id', profile.id)
+                        .eq('freelancer_id', user.id)
+                        .limit(1)
+                        .single()
+
+                      if (existing) {
+                        onClose()
+                        window.location.href = `/messages?chat=${existing.id}`
+                        return
+                      }
+
+                      // Create a direct chat without a job
+                      const { data: chat } = await supabase
+                        .from('chats')
+                        .insert({
+                          client_id:     profile.id,
+                          freelancer_id: user.id,
+                          job_id:        null,
+                        })
+                        .select()
+                        .single()
+
+                      if (chat) {
+                        await supabase.from('messages').insert({
+                          chat_id:   chat.id,
+                          sender_id: null,
+                          content:   `👋 Hi! I'm Colle. You've connected directly. Discuss your project needs and when ready, type "Colle draft contract" to formalise your agreement.`,
+                          type:      'colle',
+                        })
+                        onClose()
+                        window.location.href = `/messages?chat=${chat.id}`
+                      }
+                    }}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm text-center transition-all
+                      ${isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]'}`}>
+                    💬 Start a Conversation
+                  </button>
+                ) : (
+                  <Link to="/contracts/new"
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm text-center transition-all
+                      ${isDark ? 'bg-white text-[#0a0a0a] hover:bg-[#f0f0f0]' : 'bg-[#0a0a0a] text-white hover:bg-[#222]'}`}>
+                    📄 Post a Job
+                  </Link>
+                )
               ) : (
                 <div className={`flex-1 py-3 rounded-xl font-bold text-sm text-center cursor-not-allowed
                   ${level === 'high_risk'
@@ -552,6 +598,7 @@ export default function TrustEngine() {
         <ProfileModal
           profile={selected}
           onClose={() => setSelected(null)}
+          user={user}
           isDark={isDark}
           c={c}
           isFreelancer={isFreelancer}

@@ -811,6 +811,8 @@ Be concise, warm, and helpful. You protect both parties.`,
             </div>
           </div>
         )}
+        </div>
+
         {/* Scam warning */}
         {scamFlag && (
           <div className="mx-4 mb-3 flex items-start gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10">
@@ -1065,10 +1067,27 @@ export default function Messages() {
 
   useEffect(() => {
     const contractId = searchParams.get('contract')
-    const jobId = searchParams.get('job')
-    if ((contractId || jobId) && chats.length > 0) {
-      const match = chats.find(ch => ch.contract_id === contractId || ch.job_id === jobId)
-      if (match) { setSelected(match); setMobileView('chat') }
+    const jobId      = searchParams.get('job')
+    const chatId     = searchParams.get('chat')
+
+    if (!contractId && !jobId && !chatId) return
+    if (chats.length === 0) return
+
+    let match = null
+    if (chatId)     match = chats.find(ch => ch.id === chatId)
+    if (!match && contractId) match = chats.find(ch => ch.contract_id === contractId)
+    if (!match && jobId)      match = chats.find(ch => ch.job_id === jobId)
+
+    if (match) {
+      setSelected(match)
+      setMobileView('chat')
+    } else if (chatId || jobId) {
+      // Chat was just created — refetch after short delay and try again
+      setTimeout(() => {
+        fetchChats().then(() => {
+          // The effect will re-run when chats updates
+        })
+      }, 1000)
     }
   }, [searchParams, chats])
 

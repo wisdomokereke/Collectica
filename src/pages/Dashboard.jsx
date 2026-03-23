@@ -348,7 +348,7 @@ export default function Dashboard() {
           </div>
           <div className={`h-1.5 rounded-full ${c.bgMid}`}>
             <div className={`h-1.5 rounded-full transition-all duration-700 ${(profile?.trust_score ?? 100) >= 80 ? 'bg-green-500'
-                : (profile?.trust_score ?? 100) >= 50 ? 'bg-orange-500' : 'bg-red-500'
+              : (profile?.trust_score ?? 100) >= 50 ? 'bg-orange-500' : 'bg-red-500'
               }`} style={{ width: `${profile?.trust_score ?? 100}%` }} />
           </div>
         </div>

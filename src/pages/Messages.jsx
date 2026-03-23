@@ -811,7 +811,6 @@ Be concise, warm, and helpful. You protect both parties.`,
             </div>
           </div>
         )}
-        </div>
 
         {/* Scam warning */}
         {scamFlag && (

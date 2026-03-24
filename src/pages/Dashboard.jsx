@@ -29,12 +29,16 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
     setApplying(true)
     try {
       // Check if chat already exists for this job + freelancer
-      const { data: existingChat } = await supabase
+      const { data: existingChat, error: existingChatErr } = await supabase
         .from('chats')
         .select('id')
         .eq('job_id', job.id)
         .eq('freelancer_id', userId)
-        .single()
+        .maybeSingle()
+
+      if (existingChatErr) {
+        throw existingChatErr
+      }
 
       if (existingChat) {
         // Already applied — go straight to that chat
@@ -55,27 +59,35 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
 
       if (chatErr) throw chatErr
 
-      // Record application — silently skip if table doesn't exist
-      await supabase.from('job_applications').insert({
+      // Record application (non-blocking, but log failure for debugging)
+      const { error: appErr } = await supabase.from('job_applications').insert({
         job_id: job.id,
         freelancer_id: userId,
         chat_id: chat.id,
         status: 'pending',
-      }).then(() => { }).catch(() => { })
+      })
+      if (appErr) {
+        console.warn('job_applications insert failed:', appErr)
+      }
 
       // Colle opens the conversation
-      await supabase.from('messages').insert({
+      const { error: seedErr } = await supabase.from('messages').insert({
         chat_id: chat.id,
         sender_id: null,
         content: `👋 Hi! I'm Colle, your AI contract assistant.\n\n${job.title} — let's get this deal done properly.\n\nDiscuss the scope, timeline and budget here. When you're both ready, type "Colle draft contract" and I'll generate a proper contract with milestones from your conversation.`,
         type: 'colle',
       })
+      if (seedErr) {
+        console.warn('colle seed message failed:', seedErr)
+      }
+
+      setApplied(true)
 
       // Navigate to the specific chat — use chat.id for exact match
       navigate(`/messages?chat=${chat.id}`)
     } catch (err) {
       console.error('Apply error:', err)
-      navigate(`/messages`)
+      alert('Could not start chat from this job application. Please check your database tables/RLS and try again.')
     } finally {
       setApplying(false)
     }

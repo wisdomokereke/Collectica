@@ -28,20 +28,23 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
   const handleApply = async () => {
     setApplying(true)
     try {
-      // Check if chat already exists for this job + freelancer
-      const { data: existingChat, error: existingChatErr } = await supabase
+      // Check if chat already exists for this job + freelancer (take latest if duplicates exist)
+      const { data: existingChats, error: existingChatErr } = await supabase
         .from('chats')
         .select('id')
         .eq('job_id', job.id)
         .eq('freelancer_id', userId)
-        .maybeSingle()
+        .order('created_at', { ascending: false })
+        .limit(1)
 
       if (existingChatErr) {
         throw existingChatErr
       }
 
+      const existingChat = existingChats?.[0]
       if (existingChat) {
         // Already applied — go straight to that chat
+        setApplied(true)
         navigate(`/messages?chat=${existingChat.id}`)
         return
       }
@@ -57,7 +60,26 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
         .select()
         .single()
 
-      if (chatErr) throw chatErr
+      if (chatErr) {
+        // If a duplicate was created concurrently, fetch and use the existing chat
+        const duplicateKey = chatErr.code === '23505' || String(chatErr.message || '').toLowerCase().includes('duplicate')
+        if (duplicateKey) {
+          const { data: fallbackChats } = await supabase
+            .from('chats')
+            .select('id')
+            .eq('job_id', job.id)
+            .eq('freelancer_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+          const fallbackChat = fallbackChats?.[0]
+          if (fallbackChat) {
+            setApplied(true)
+            navigate(`/messages?chat=${fallbackChat.id}`)
+            return
+          }
+        }
+        throw chatErr
+      }
 
       // Record application (non-blocking, but log failure for debugging)
       const { error: appErr } = await supabase.from('job_applications').insert({

@@ -45,7 +45,18 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
       if (existingChat) {
         // Already applied — go straight to that chat
         setApplied(true)
-        navigate(`/messages?chat=${existingChat.id}`)
+        navigate(`/messages?chat=${existingChat.id}`, {
+          state: {
+            prefillChat: {
+              id: existingChat.id,
+              job_id: job.id,
+              client_id: job.client_id,
+              freelancer_id: userId,
+              job,
+              client: job.client || null,
+            },
+          },
+        })
         return
       }
 
@@ -74,7 +85,18 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
           const fallbackChat = fallbackChats?.[0]
           if (fallbackChat) {
             setApplied(true)
-            navigate(`/messages?chat=${fallbackChat.id}`)
+            navigate(`/messages?chat=${fallbackChat.id}`, {
+              state: {
+                prefillChat: {
+                  id: fallbackChat.id,
+                  job_id: job.id,
+                  client_id: job.client_id,
+                  freelancer_id: userId,
+                  job,
+                  client: job.client || null,
+                },
+              },
+            })
             return
           }
         }
@@ -106,7 +128,18 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
       setApplied(true)
 
       // Navigate to the specific chat — use chat.id for exact match
-      navigate(`/messages?chat=${chat.id}`)
+      navigate(`/messages?chat=${chat.id}`, {
+        state: {
+          prefillChat: {
+            id: chat.id,
+            job_id: job.id,
+            client_id: job.client_id,
+            freelancer_id: userId,
+            job,
+            client: job.client || null,
+          },
+        },
+      })
     } catch (err) {
       console.error('Apply error:', err)
       alert('Could not start chat from this job application. Please check your database tables/RLS and try again.')

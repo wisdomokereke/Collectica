@@ -396,13 +396,36 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
   const [loading, setLoading] = useState(true)
   const [signingPin, setSigningPin] = useState('')
   const [signingMsgId, setSigningMsgId] = useState(null)
+  const [resolvedPartyName, setResolvedPartyName] = useState('')
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
 
   const partyName = myId === chat.client_id
     ? chat.freelancer?.full_name
     : chat.client?.full_name
-  const initials = (partyName || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const displayPartyName = partyName || resolvedPartyName
+  const initials = (displayPartyName || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+
+  useEffect(() => {
+    const otherId = myId === chat.client_id ? chat.freelancer_id : chat.client_id
+    if (partyName) {
+      setResolvedPartyName(partyName)
+      return
+    }
+    if (!otherId) {
+      setResolvedPartyName('')
+      return
+    }
+    const loadOtherParty = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', otherId)
+        .maybeSingle()
+      setResolvedPartyName(data?.full_name || '')
+    }
+    loadOtherParty()
+  }, [partyName, myId, chat.client_id, chat.freelancer_id])
 
   useEffect(() => {
     fetchMessages()
@@ -740,7 +763,7 @@ Be concise, warm, and helpful. You protect both parties.`,
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-sm font-bold ${c.text}`}>{partyName || 'Unknown'}</p>
+            <p className={`text-sm font-bold ${c.text}`}>{displayPartyName || 'Unknown'}</p>
             <p className={`text-xs ${c.muted}`}>{chat.contract?.title || chat.job?.title || 'Conversation'}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -1085,6 +1108,24 @@ export default function Messages() {
 
     // Not found in local state — fetch directly (handles race condition after Apply)
     if (!user) return
+    const hydrateChatsWithUsers = async (rawChats) => {
+      if (!rawChats?.length) return []
+      const ids = Array.from(new Set(
+        rawChats.flatMap(ch => [ch.client_id, ch.freelancer_id]).filter(Boolean)
+      ))
+      if (ids.length === 0) return rawChats
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, trust_score')
+        .in('id', ids)
+      const userMap = new Map((usersData || []).map(u => [u.id, u]))
+      return rawChats.map(ch => ({
+        ...ch,
+        client: ch.client || userMap.get(ch.client_id) || null,
+        freelancer: ch.freelancer || userMap.get(ch.freelancer_id) || null,
+      }))
+    }
+
     const fetchAndSelect = async () => {
       let query = supabase
         .from('chats')
@@ -1113,15 +1154,17 @@ export default function Messages() {
       }
 
       if (data) {
+        const [hydrated] = await hydrateChatsWithUsers([data])
+        const chatData = hydrated || data
         const { data: lm } = await supabase
           .from('messages')
           .select('content, created_at, type')
-          .eq('chat_id', data.id)
+          .eq('chat_id', chatData.id)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
-        const fullChat = { ...data, lastMessage: lm }
-        setChats(prev => prev.find(c => c.id === data.id) ? prev : [fullChat, ...prev])
+        const fullChat = { ...chatData, lastMessage: lm }
+        setChats(prev => prev.find(c => c.id === chatData.id) ? prev : [fullChat, ...prev])
         setSelected(fullChat)
         setMobileView('chat')
       } else {
@@ -1133,6 +1176,24 @@ export default function Messages() {
   }, [searchParams, chats.length, user])
 
   const fetchChats = async () => {
+    const hydrateChatsWithUsers = async (rawChats) => {
+      if (!rawChats?.length) return []
+      const ids = Array.from(new Set(
+        rawChats.flatMap(ch => [ch.client_id, ch.freelancer_id]).filter(Boolean)
+      ))
+      if (ids.length === 0) return rawChats
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, trust_score')
+        .in('id', ids)
+      const userMap = new Map((usersData || []).map(u => [u.id, u]))
+      return rawChats.map(ch => ({
+        ...ch,
+        client: ch.client || userMap.get(ch.client_id) || null,
+        freelancer: ch.freelancer || userMap.get(ch.freelancer_id) || null,
+      }))
+    }
+
     let { data, error } = await supabase
       .from('chats')
       .select(`
@@ -1156,7 +1217,8 @@ export default function Messages() {
     }
 
     if (data) {
-      const withLast = await Promise.all(data.map(async ch => {
+      const hydratedChats = await hydrateChatsWithUsers(data)
+      const withLast = await Promise.all(hydratedChats.map(async ch => {
         const { data: lm } = await supabase
           .from('messages')
           .select('content, created_at, type')

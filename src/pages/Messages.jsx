@@ -1100,7 +1100,18 @@ export default function Messages() {
       else if (jobId) query = query.eq('job_id', jobId).eq('freelancer_id', user.id)
       else if (contractId) query = query.eq('contract_id', contractId)
 
-      const { data } = await query.maybeSingle()
+      let { data, error } = await query.maybeSingle()
+
+      // Fallback: if joined query fails due schema drift/RLS on related tables, fetch base chat only
+      if (error) {
+        let baseQuery = supabase.from('chats').select('*')
+        if (chatId) baseQuery = baseQuery.eq('id', chatId)
+        else if (jobId) baseQuery = baseQuery.eq('job_id', jobId).eq('freelancer_id', user.id)
+        else if (contractId) baseQuery = baseQuery.eq('contract_id', contractId)
+        const { data: baseData } = await baseQuery.maybeSingle()
+        data = baseData
+      }
+
       if (data) {
         const { data: lm } = await supabase
           .from('messages')
@@ -1122,7 +1133,7 @@ export default function Messages() {
   }, [searchParams, chats.length, user])
 
   const fetchChats = async () => {
-    const { data } = await supabase
+    let { data, error } = await supabase
       .from('chats')
       .select(`
         *,
@@ -1134,6 +1145,16 @@ export default function Messages() {
       .or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
 
+    // Fallback: if relation joins fail, still load chats so user can open conversation
+    if (error) {
+      const fallback = await supabase
+        .from('chats')
+        .select('*')
+        .or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+      data = fallback.data || []
+    }
+
     if (data) {
       const withLast = await Promise.all(data.map(async ch => {
         const { data: lm } = await supabase
@@ -1142,7 +1163,7 @@ export default function Messages() {
           .eq('chat_id', ch.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle()
         return { ...ch, lastMessage: lm }
       }))
       setChats(withLast)

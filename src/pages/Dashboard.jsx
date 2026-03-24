@@ -34,11 +34,11 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
         .select('id')
         .eq('job_id', job.id)
         .eq('freelancer_id', userId)
-        .maybeSingle()
+        .single()
 
       if (existingChat) {
-        // Already applied — go straight to messages
-        navigate(`/messages?job=${job.id}`)
+        // Already applied — go straight to that chat
+        navigate(`/messages?chat=${existingChat.id}`)
         return
       }
 
@@ -71,11 +71,10 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
         type: 'colle',
       })
 
-      // Navigate to messages no matter what
-      navigate(`/messages?job=${job.id}`)
+      // Navigate to the specific chat — use chat.id for exact match
+      navigate(`/messages?chat=${chat.id}`)
     } catch (err) {
       console.error('Apply error:', err)
-      // Still try to navigate even if something failed
       navigate(`/messages`)
     } finally {
       setApplying(false)

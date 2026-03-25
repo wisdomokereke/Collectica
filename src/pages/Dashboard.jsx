@@ -28,17 +28,35 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
   const handleApply = async () => {
     setApplying(true)
     try {
-      // Check if chat already exists for this job + freelancer
-      const { data: existingChat } = await supabase
+      // Check if chat already exists for this job + freelancer (take latest if duplicates exist)
+      const { data: existingChats, error: existingChatErr } = await supabase
         .from('chats')
         .select('id')
         .eq('job_id', job.id)
         .eq('freelancer_id', userId)
-        .single()
+        .order('created_at', { ascending: false })
+        .limit(1)
 
+      if (existingChatErr) {
+        throw existingChatErr
+      }
+
+      const existingChat = existingChats?.[0]
       if (existingChat) {
-        // Already applied — go straight to messages
-        navigate(`/messages?job=${job.id}`)
+        // Already applied — go straight to that chat
+        setApplied(true)
+        navigate(`/messages?chat=${existingChat.id}`, {
+          state: {
+            prefillChat: {
+              id: existingChat.id,
+              job_id: job.id,
+              client_id: job.client_id,
+              freelancer_id: userId,
+              job,
+              client: job.client || null,
+            },
+          },
+        })
         return
       }
 
@@ -53,30 +71,78 @@ function ApplyButton({ job, userId, navigate, c, isDark }) {
         .select()
         .single()
 
-      if (chatErr) throw chatErr
+      if (chatErr) {
+        // If a duplicate was created concurrently, fetch and use the existing chat
+        const duplicateKey = chatErr.code === '23505' || String(chatErr.message || '').toLowerCase().includes('duplicate')
+        if (duplicateKey) {
+          const { data: fallbackChats } = await supabase
+            .from('chats')
+            .select('id')
+            .eq('job_id', job.id)
+            .eq('freelancer_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+          const fallbackChat = fallbackChats?.[0]
+          if (fallbackChat) {
+            setApplied(true)
+            navigate(`/messages?chat=${fallbackChat.id}`, {
+              state: {
+                prefillChat: {
+                  id: fallbackChat.id,
+                  job_id: job.id,
+                  client_id: job.client_id,
+                  freelancer_id: userId,
+                  job,
+                  client: job.client || null,
+                },
+              },
+            })
+            return
+          }
+        }
+        throw chatErr
+      }
 
-      // Record application — silently skip if table doesn't exist
-      await supabase.from('job_applications').insert({
+      // Record application (non-blocking, but log failure for debugging)
+      const { error: appErr } = await supabase.from('job_applications').insert({
         job_id: job.id,
         freelancer_id: userId,
         chat_id: chat.id,
         status: 'pending',
-      }).then(() => { }).catch(() => { })
+      })
+      if (appErr) {
+        console.warn('job_applications insert failed:', appErr)
+      }
 
       // Colle opens the conversation
-      await supabase.from('messages').insert({
+      const { error: seedErr } = await supabase.from('messages').insert({
         chat_id: chat.id,
         sender_id: null,
         content: `👋 Hi! I'm Colle, your AI contract assistant.\n\n${job.title} — let's get this deal done properly.\n\nDiscuss the scope, timeline and budget here. When you're both ready, type "Colle draft contract" and I'll generate a proper contract with milestones from your conversation.`,
         type: 'colle',
       })
+      if (seedErr) {
+        console.warn('colle seed message failed:', seedErr)
+      }
 
-      // Navigate to messages no matter what
-      navigate(`/messages?job=${job.id}`)
+      setApplied(true)
+
+      // Navigate to the specific chat — use chat.id for exact match
+      navigate(`/messages?chat=${chat.id}`, {
+        state: {
+          prefillChat: {
+            id: chat.id,
+            job_id: job.id,
+            client_id: job.client_id,
+            freelancer_id: userId,
+            job,
+            client: job.client || null,
+          },
+        },
+      })
     } catch (err) {
       console.error('Apply error:', err)
-      // Still try to navigate even if something failed
-      navigate(`/messages`)
+      alert('Could not start chat from this job application. Please check your database tables/RLS and try again.')
     } finally {
       setApplying(false)
     }
@@ -348,7 +414,7 @@ export default function Dashboard() {
           </div>
           <div className={`h-1.5 rounded-full ${c.bgMid}`}>
             <div className={`h-1.5 rounded-full transition-all duration-700 ${(profile?.trust_score ?? 100) >= 80 ? 'bg-green-500'
-                : (profile?.trust_score ?? 100) >= 50 ? 'bg-orange-500' : 'bg-red-500'
+              : (profile?.trust_score ?? 100) >= 50 ? 'bg-orange-500' : 'bg-red-500'
               }`} style={{ width: `${profile?.trust_score ?? 100}%` }} />
           </div>
         </div>

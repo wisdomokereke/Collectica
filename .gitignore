@@ -4,3 +4,10 @@ dist
 *.local
 
 .vercel
+
+# Vite internal cache files
+*.timestamp-*.mjs
+
+# Build logs
+build_out.txt
+build_output.log

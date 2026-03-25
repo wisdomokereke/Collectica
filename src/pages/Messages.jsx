@@ -12,23 +12,23 @@ import { useAuth, ROLES } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 
 const SCAM_WORDS = [
-  'outside the platform','pay me directly','whatsapp me',
-  'bank transfer directly','bypass','off platform','my personal account',
-  'send to my account','pay cash'
+  'outside the platform', 'pay me directly', 'whatsapp me',
+  'bank transfer directly', 'bypass', 'off platform', 'my personal account',
+  'send to my account', 'pay cash'
 ]
 const COLLE_TRIGGER = /^colle\b/i
 
 // ── Notification helpers ───────────────────────────────────
 function notifIcon(type) {
   const icons = {
-    message:    '💬',
-    milestone:  '📋',
-    payment:    '💸',
-    contract:   '📄',
-    dispute:    '⚠️',
-    deposit:    '💳',
+    message: '💬',
+    milestone: '📋',
+    payment: '💸',
+    contract: '📄',
+    dispute: '⚠️',
+    deposit: '💳',
     escrow_release: '✅',
-    system:     '🔔',
+    system: '🔔',
   }
   return icons[type] || '🔔'
 }
@@ -36,19 +36,19 @@ function notifIcon(type) {
 function timeAgo(date) {
   const diff = Math.floor((Date.now() - new Date(date)) / 1000)
   if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff/60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return new Date(date).toLocaleDateString()
 }
 
 // ── Milestone status config ────────────────────────────────
 const MS_STATUS = {
-  pending:            { label: 'Pending',    color: 'text-[#888]',     dot: 'bg-[#555]'      },
-  in_progress:        { label: 'In Progress',color: 'text-blue-400',   dot: 'bg-blue-400'    },
-  submitted:          { label: 'Submitted',  color: 'text-orange-500', dot: 'bg-orange-500'  },
-  revision_requested: { label: 'Revision',   color: 'text-red-400',    dot: 'bg-red-400'     },
-  approved:           { label: 'Approved',   color: 'text-green-500',  dot: 'bg-green-500'   },
-  paid:               { label: 'Paid',       color: 'text-green-500',  dot: 'bg-green-500'   },
+  pending: { label: 'Pending', color: 'text-[#888]', dot: 'bg-[#555]' },
+  in_progress: { label: 'In Progress', color: 'text-blue-400', dot: 'bg-blue-400' },
+  submitted: { label: 'Submitted', color: 'text-orange-500', dot: 'bg-orange-500' },
+  revision_requested: { label: 'Revision', color: 'text-red-400', dot: 'bg-red-400' },
+  approved: { label: 'Approved', color: 'text-green-500', dot: 'bg-green-500' },
+  paid: { label: 'Paid', color: 'text-green-500', dot: 'bg-green-500' },
 }
 
 // ── Message bubble ─────────────────────────────────────────
@@ -68,7 +68,7 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
     <div className="flex justify-start my-3 px-2">
       <div className="max-w-[85%] rounded-2xl border overflow-hidden border-green-500/20 bg-green-500/5">
         <div className="flex items-center gap-2 px-4 py-2 border-b border-green-500/20">
-          <Bot size={12} className="text-green-500"/>
+          <Bot size={12} className="text-green-500" />
           <span className="text-xs font-bold text-green-500">Colle AI</span>
           <span className="text-xs text-green-500/40 ml-auto">Collectica AI</span>
         </div>
@@ -81,21 +81,21 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
 
   if (msg.type === 'contract_draft') {
     const meta = msg.metadata || {}
-    const ct   = meta.contract || {}
-    const signedClient     = meta.signed_client
+    const ct = meta.contract || {}
+    const signedClient = meta.signed_client
     const signedFreelancer = meta.signed_freelancer
-    const bothSigned       = signedClient && signedFreelancer
-    const amClient         = myId === meta.client_id
-    const amFreelancer     = myId === meta.freelancer_id
-    const iSigned          = amClient ? signedClient : signedFreelancer
-    const onSign           = onSignContract ? () => onSignContract(msg) : null
+    const bothSigned = signedClient && signedFreelancer
+    const amClient = myId === meta.client_id
+    const amFreelancer = myId === meta.freelancer_id
+    const iSigned = amClient ? signedClient : signedFreelancer
+    const onSign = onSignContract ? () => onSignContract(msg) : null
 
     return (
       <div className="flex justify-center my-4 px-2">
         <div className={`w-full max-w-sm rounded-2xl border-2 overflow-hidden
           ${bothSigned ? 'border-green-500/40 bg-green-500/5' : 'border-blue-500/30 bg-blue-500/5'}`}>
           <div className={`flex items-center gap-2 px-4 py-3 border-b ${bothSigned ? 'border-green-500/20' : 'border-blue-500/20'}`}>
-            <Bot size={12} className={bothSigned ? 'text-green-500' : 'text-blue-400'}/>
+            <Bot size={12} className={bothSigned ? 'text-green-500' : 'text-blue-400'} />
             <span className={`text-xs font-bold ${bothSigned ? 'text-green-500' : 'text-blue-400'}`}>
               {bothSigned ? '✅ Contract Active' : '📄 Contract Draft — Ready to Sign'}
             </span>
@@ -128,13 +128,13 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
             {/* Signature status */}
             <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]'}`}>
               {[
-                { label: 'Client',     signed: signedClient     },
+                { label: 'Client', signed: signedClient },
                 { label: 'Freelancer', signed: signedFreelancer },
               ].map(p => (
                 <div key={p.label} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg ${p.signed ? 'bg-green-500/10' : isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'}`}>
                   {p.signed
-                    ? <CheckCircle size={11} className="text-green-500"/>
-                    : <Clock size={11} className="text-orange-500"/>}
+                    ? <CheckCircle size={11} className="text-green-500" />
+                    : <Clock size={11} className="text-orange-500" />}
                   <span className={`text-xs font-bold ${p.signed ? 'text-green-500' : c.muted}`}>
                     {p.label} {p.signed ? '✓' : '...'}
                   </span>
@@ -145,7 +145,7 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
             {!bothSigned && !iSigned && onSign && (
               <button onClick={onSign}
                 className="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center justify-center gap-1.5">
-                <Shield size={12}/> Sign This Contract
+                <Shield size={12} /> Sign This Contract
               </button>
             )}
             {!bothSigned && iSigned && (
@@ -172,12 +172,12 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
           : isDark ? 'bg-[#1a1a1a] text-white border-[#2e2e2e]' : 'bg-white border-[#e0e0e0]'}`}>
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
           ${isMe ? 'bg-black/10' : isDark ? 'bg-[#2e2e2e]' : 'bg-[#f0f0f0]'}`}>
-          <File size={16}/>
+          <File size={16} />
         </div>
         <div className="min-w-0">
           <p className="text-sm font-bold truncate max-w-[140px]">{msg.file_name || 'File'}</p>
           <p className="text-xs opacity-60">
-            {msg.file_size ? `${(msg.file_size/1024/1024).toFixed(1)} MB` : 'Attachment'}
+            {msg.file_size ? `${(msg.file_size / 1024 / 1024).toFixed(1)} MB` : 'Attachment'}
           </p>
         </div>
       </div>
@@ -194,7 +194,7 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
           {msg.content}
         </div>
         <p className={`text-xs px-1 ${c.muted} ${isMe ? 'text-right' : ''}`}>
-          {new Date(msg.created_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}
+          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
     </div>
@@ -203,9 +203,9 @@ function MsgBubble({ msg, isDark, c, myId, onSignContract }) {
 
 // ── Contract + Milestone panel ─────────────────────────────
 function ContractPanel({ chatId, isDark, c }) {
-  const [contract, setContract]   = useState(null)
+  const [contract, setContract] = useState(null)
   const [milestones, setMilestones] = useState([])
-  const [loading, setLoading]     = useState(true)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
@@ -251,7 +251,7 @@ function ContractPanel({ chatId, isDark, c }) {
 
   if (loading) return (
     <div className="flex items-center justify-center py-8">
-      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -266,11 +266,11 @@ function ContractPanel({ chatId, isDark, c }) {
   )
 
   const CT_STATUS = {
-    draft:              { label: 'Draft',          color: 'text-blue-400'    },
-    pending_signatures: { label: 'Awaiting Sigs',  color: 'text-orange-500'  },
-    active:             { label: 'Active',          color: 'text-green-500'   },
-    completed:          { label: 'Completed',       color: 'text-[#888]'      },
-    disputed:           { label: 'Disputed',        color: 'text-red-500'     },
+    draft: { label: 'Draft', color: 'text-blue-400' },
+    pending_signatures: { label: 'Awaiting Sigs', color: 'text-orange-500' },
+    active: { label: 'Active', color: 'text-green-500' },
+    completed: { label: 'Completed', color: 'text-[#888]' },
+    disputed: { label: 'Disputed', color: 'text-red-500' },
   }
   const cs = CT_STATUS[contract.status] || CT_STATUS.draft
   const paidMilestones = milestones.filter(m => m.status === 'paid' || m.status === 'approved').length
@@ -300,8 +300,8 @@ function ContractPanel({ chatId, isDark, c }) {
             ].map(p => (
               <div key={p.label} className="flex items-center gap-1.5">
                 {p.signed
-                  ? <CheckCircle size={11} className="text-green-500 flex-shrink-0"/>
-                  : <Clock size={11} className="text-orange-500 flex-shrink-0"/>}
+                  ? <CheckCircle size={11} className="text-green-500 flex-shrink-0" />
+                  : <Clock size={11} className="text-orange-500 flex-shrink-0" />}
                 <div className="min-w-0">
                   <p className={`text-xs font-bold truncate ${c.text}`}>{p.name || p.label}</p>
                   <p className={`text-xs ${p.signed ? 'text-green-500' : 'text-orange-500'}`}>
@@ -319,7 +319,7 @@ function ContractPanel({ chatId, isDark, c }) {
                 <span className={`text-xs font-bold ${c.text}`}>{progress}%</span>
               </div>
               <div className={`h-1.5 rounded-full ${isDark ? 'bg-[#2e2e2e]' : 'bg-[#e0e0e0]'}`}>
-                <div className="h-1.5 rounded-full bg-green-500 transition-all" style={{ width: `${progress}%` }}/>
+                <div className="h-1.5 rounded-full bg-green-500 transition-all" style={{ width: `${progress}%` }} />
               </div>
             </div>
           )}
@@ -339,7 +339,7 @@ function ContractPanel({ chatId, isDark, c }) {
                 <div key={ms.id}
                   className={`${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f8f8f8]'} border ${c.border} rounded-xl p-3`}>
                   <div className="flex items-start gap-2">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${s.dot}`}/>
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${s.dot}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-1">
                         <p className={`text-xs font-bold ${c.text} leading-snug`}>
@@ -376,7 +376,7 @@ function ContractPanel({ chatId, isDark, c }) {
         ${contract.escrow_funded
           ? 'bg-green-500/5 border border-green-500/20'
           : isDark ? 'bg-[#1a1a1a] border border-[#2e2e2e]' : 'bg-[#f8f8f8] border border-[#e0e0e0]'}`}>
-        <Lock size={12} className={contract.escrow_funded ? 'text-green-500' : c.muted}/>
+        <Lock size={12} className={contract.escrow_funded ? 'text-green-500' : c.muted} />
         <p className={`text-xs font-bold ${contract.escrow_funded ? 'text-green-500' : c.muted}`}>
           {contract.escrow_funded ? 'Escrow funded — payment protected' : 'Escrow not yet funded'}
         </p>
@@ -387,22 +387,45 @@ function ContractPanel({ chatId, isDark, c }) {
 
 // ── Chat view ──────────────────────────────────────────────
 function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
-  const [msgs, setMsgs]             = useState([])
-  const [input, setInput]           = useState('')
-  const [scamFlag, setScamFlag]     = useState(false)
-  const [aiLoading, setAiLoading]   = useState(false)
+  const [msgs, setMsgs] = useState([])
+  const [input, setInput] = useState('')
+  const [scamFlag, setScamFlag] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
   const [colleActive, setColleActive] = useState(false)
-  const [showPanel, setShowPanel]   = useState(false)
-  const [loading, setLoading]       = useState(true)
+  const [showPanel, setShowPanel] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [signingPin, setSigningPin] = useState('')
   const [signingMsgId, setSigningMsgId] = useState(null)
+  const [resolvedPartyName, setResolvedPartyName] = useState('')
   const bottomRef = useRef(null)
-  const fileRef   = useRef(null)
+  const fileRef = useRef(null)
 
   const partyName = myId === chat.client_id
     ? chat.freelancer?.full_name
     : chat.client?.full_name
-  const initials = (partyName || '?').split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+  const displayPartyName = partyName || resolvedPartyName
+  const initials = (displayPartyName || '?').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+
+  useEffect(() => {
+    const otherId = myId === chat.client_id ? chat.freelancer_id : chat.client_id
+    if (partyName) {
+      setResolvedPartyName(partyName)
+      return
+    }
+    if (!otherId) {
+      setResolvedPartyName('')
+      return
+    }
+    const loadOtherParty = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', otherId)
+        .maybeSingle()
+      setResolvedPartyName(data?.full_name || '')
+    }
+    loadOtherParty()
+  }, [partyName, myId, chat.client_id, chat.freelancer_id])
 
   useEffect(() => {
     fetchMessages()
@@ -481,12 +504,12 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
 
     // Detect intent
     const wantsDraft = /draft|contract|set up|create contract|write contract|scope|agree|deal|milestone/i.test(userMessage)
-    const wantsEdit  = /colle.*(change|edit|update|modify|remove|add|revise|fix|adjust)/i.test(userMessage) ||
-                       /(change|edit|update|modify|remove|add|revise|fix|adjust).*(contract|milestone|budget|scope|deadline|payment)/i.test(userMessage)
+    const wantsEdit = /colle.*(change|edit|update|modify|remove|add|revise|fix|adjust)/i.test(userMessage) ||
+      /(change|edit|update|modify|remove|add|revise|fix|adjust).*(contract|milestone|budget|scope|deadline|payment)/i.test(userMessage)
 
     // Find existing contract draft in chat if any
     const existingDraft = msgs.findLast?.(m => m.type === 'contract_draft') ||
-                          [...msgs].reverse().find(m => m.type === 'contract_draft')
+      [...msgs].reverse().find(m => m.type === 'contract_draft')
 
     const prompt = `${userMessage.length > 6 ? `The user said: "${userMessage}"\n\n` : ''}${jobContext ? `Job Context:${jobContext}\n\n` : ''}Conversation:\n${history || 'No messages yet.'}`
 
@@ -499,7 +522,7 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+            model: 'gemini-1.5-flash', max_tokens: 2000,
             system: `You are Colle, the AI contract assistant for Collectica. The user wants to edit an existing contract draft. Apply their requested changes and return the COMPLETE updated contract as valid JSON only, with this exact structure:
 {
   "title": "contract title",
@@ -512,39 +535,37 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
   "summary": "one sentence summary of what changed"
 }
 Return ONLY the JSON. Apply the user's edit faithfully.`,
-            messages: [{
-              role: 'user',
-              content: `Current contract:\n${JSON.stringify(currentContract, null, 2)}\n\nUser's edit request: "${userMessage}"\n\nReturn the updated contract JSON.`
-            }]
-          })
+          messages: [{
+            role: 'user',
+            content: `Current contract:\n${JSON.stringify(currentContract, null, 2)}\n\nUser's edit request: "${userMessage}"\n\nReturn the updated contract JSON.`
+          }]
         })
-        const data = await res.json()
-        const raw  = data.content?.[0]?.text || ''
+        const raw = data.content?.[0]?.text || ''
         try {
           const updatedContract = JSON.parse(raw.replace(/```json|```/g, '').trim())
 
           // Insert NEW contract_draft (updated version)
           await supabase.from('messages').insert({
-            chat_id:   chat.id,
+            chat_id: chat.id,
             sender_id: null,
-            content:   `✏️ Contract updated: ${updatedContract.summary}`,
-            type:      'contract_draft',
-            metadata:  {
-              contract:          updatedContract,
-              signed_client:     false,
+            content: `✏️ Contract updated: ${updatedContract.summary}`,
+            type: 'contract_draft',
+            metadata: {
+              contract: updatedContract,
+              signed_client: false,
               signed_freelancer: false,
-              client_id:         chat.client_id,
-              freelancer_id:     chat.freelancer_id,
-              version:           (existingDraft.metadata?.version || 1) + 1,
+              client_id: chat.client_id,
+              freelancer_id: chat.freelancer_id,
+              version: (existingDraft.metadata?.version || 1) + 1,
             },
           })
 
           // Colle explains the change
           await supabase.from('messages').insert({
-            chat_id:   chat.id,
+            chat_id: chat.id,
             sender_id: null,
-            content:   `I've updated the contract above. ${updatedContract.summary}\n\nReview the new version and sign when you're both happy with it.`,
-            type:      'colle',
+            content: `I've updated the contract above. ${updatedContract.summary}\n\nReview the new version and sign when you're both happy with it.`,
+            type: 'colle',
           })
         } catch {
           await supabase.from('messages').insert({
@@ -559,7 +580,7 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+            model: 'gemini-1.5-flash', max_tokens: 2000,
             system: `You are Colle, the AI legal assistant for Collectica. Extract a fair contract from the conversation. Return ONLY valid JSON:
 {
   "title": "descriptive contract title",
@@ -578,25 +599,23 @@ Rules:
 - if a brief is attached, use its details
 - if no explicit price agreed, use the middle of the job budget range
 Return ONLY the JSON. No other text.`,
-            messages: [{ role: 'user', content: prompt }]
-          })
+          messages: [{ role: 'user', content: prompt }]
         })
-        const data = await res.json()
-        const raw  = data.content?.[0]?.text || ''
+        const raw = data.content?.[0]?.text || ''
         try {
           const contractData = JSON.parse(raw.replace(/```json|```/g, '').trim())
           // Insert as contract_draft message type with metadata
           await supabase.from('messages').insert({
-            chat_id:   chat.id,
+            chat_id: chat.id,
             sender_id: null,
-            content:   contractData.summary || 'Contract draft ready for review.',
-            type:      'contract_draft',
-            metadata:  {
-              contract:         contractData,
-              signed_client:    false,
-              signed_freelancer:false,
-              client_id:        chat.client_id,
-              freelancer_id:    chat.freelancer_id,
+            content: contractData.summary || 'Contract draft ready for review.',
+            type: 'contract_draft',
+            metadata: {
+              contract: contractData,
+              signed_client: false,
+              signed_freelancer: false,
+              client_id: chat.client_id,
+              freelancer_id: chat.freelancer_id,
             },
           })
         } catch {
@@ -611,17 +630,15 @@ Return ONLY the JSON. No other text.`,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+            model: 'gemini-1.5-flash', max_tokens: 1000,
             system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. 
 
 When they're ready: tell them to type "Colle draft contract" to generate a signable contract from this conversation.
 After drafting: they can say things like "Colle change the budget to ₦200,000" or "Colle add a milestone for testing" to edit it.
 
 Be concise, warm, and helpful. You protect both parties.`,
-            messages: [{ role: 'user', content: prompt }]
-          })
+          messages: [{ role: 'user', content: prompt }]
         })
-        const data = await res.json()
         const text = data.content?.[0]?.text || 'I could not process that. Please try again.'
         await supabase.from('messages').insert({
           chat_id: chat.id, sender_id: null, content: text, type: 'colle',
@@ -651,10 +668,10 @@ Be concise, warm, and helpful. You protect both parties.`,
       alert('Incorrect signing password'); return
     }
 
-    const isClient      = myId === chat.client_id
-    const newMeta       = { ...msg.metadata }
+    const isClient = myId === chat.client_id
+    const newMeta = { ...msg.metadata }
     if (isClient) newMeta.signed_client = true
-    else          newMeta.signed_freelancer = true
+    else newMeta.signed_freelancer = true
 
     // Update message metadata
     await supabase.from('messages')
@@ -667,19 +684,19 @@ Be concise, warm, and helpful. You protect both parties.`,
       const { data: contract } = await supabase
         .from('contracts')
         .insert({
-          chat_id:          chat.id,
-          job_id:           chat.job_id,
-          client_id:        chat.client_id,
-          freelancer_id:    chat.freelancer_id,
-          title:            ct.title,
-          scope:            ct.scope,
-          total_value:      ct.total_value,
-          currency:         ct.currency || 'NGN',
-          status:           'pending_signatures',
-          version:          1,
-          signed_client:    true,
+          chat_id: chat.id,
+          job_id: chat.job_id,
+          client_id: chat.client_id,
+          freelancer_id: chat.freelancer_id,
+          title: ct.title,
+          scope: ct.scope,
+          total_value: ct.total_value,
+          currency: ct.currency || 'NGN',
+          status: 'pending_signatures',
+          version: 1,
+          signed_client: true,
           signed_client_at: new Date().toISOString(),
-          signed_freelancer:true,
+          signed_freelancer: true,
           signed_freelancer_at: new Date().toISOString(),
         })
         .select()
@@ -690,12 +707,12 @@ Be concise, warm, and helpful. You protect both parties.`,
         if (ct.milestones?.length > 0) {
           await supabase.from('milestones').insert(
             ct.milestones.map(m => ({
-              contract_id:  contract.id,
-              title:        m.title,
-              description:  m.description,
-              amount:       m.amount,
-              order_index:  m.order_index,
-              max_revisions:2,
+              contract_id: contract.id,
+              title: m.title,
+              description: m.description,
+              amount: m.amount,
+              order_index: m.order_index,
+              max_revisions: 2,
             }))
           )
         }
@@ -733,19 +750,19 @@ Be concise, warm, and helpful. You protect both parties.`,
         <div className={`flex items-center gap-3 px-4 py-3 border-b ${c.border} flex-shrink-0 ${isDark ? 'bg-[#111]' : 'bg-white'}`}>
           {onBack && (
             <button onClick={onBack} className={`p-1.5 rounded-lg ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} md:hidden`}>
-              <ArrowLeft size={16} className={c.text}/>
+              <ArrowLeft size={16} className={c.text} />
             </button>
           )}
           <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} border ${c.border} flex items-center justify-center font-bold text-sm ${c.text} flex-shrink-0`}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-sm font-bold ${c.text}`}>{partyName || 'Unknown'}</p>
+            <p className={`text-sm font-bold ${c.text}`}>{displayPartyName || 'Unknown'}</p>
             <p className={`text-xs ${c.muted}`}>{chat.contract?.title || chat.job?.title || 'Conversation'}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${c.border} text-xs font-bold`}>
-              <Bot size={10} className={colleActive ? 'text-green-500' : c.muted}/>
+              <Bot size={10} className={colleActive ? 'text-green-500' : c.muted} />
               <span className={colleActive ? 'text-green-500' : c.muted}>Colle</span>
             </div>
             {/* Contract panel toggle */}
@@ -754,9 +771,9 @@ Be concise, warm, and helpful. You protect both parties.`,
                 ${showPanel
                   ? 'border-green-500/30 bg-green-500/10 text-green-500'
                   : `${c.border} ${c.light} ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-[#f0f0f0]'}`}`}>
-              <FileText size={11}/>
+              <FileText size={11} />
               <span className="hidden sm:inline">Contract</span>
-              {showPanel ? <ChevronUp size={11}/> : <ChevronDown size={11}/>}
+              {showPanel ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
             </button>
           </div>
         </div>
@@ -765,7 +782,7 @@ Be concise, warm, and helpful. You protect both parties.`,
         <div className="flex-1 overflow-y-auto px-2 py-4">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+              <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : msgs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-8 gap-4">
@@ -783,7 +800,7 @@ Be concise, warm, and helpful. You protect both parties.`,
               onSignContract={m.type === 'contract_draft' ? () => setSigningMsgId(m.id) : null}
             />
           ))}
-          <div ref={bottomRef}/>
+          <div ref={bottomRef} />
         </div>
 
         {/* Signing PIN modal */}
@@ -796,7 +813,7 @@ Be concise, warm, and helpful. You protect both parties.`,
                 placeholder="Your signing password"
                 value={signingPin}
                 onChange={e => setSigningPin(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { const msg = msgs.find(m => m.id === signingMsgId); if (msg) signContract(msg) }}}
+                onKeyDown={e => { if (e.key === 'Enter') { const msg = msgs.find(m => m.id === signingMsgId); if (msg) signContract(msg) } }}
                 className={`flex-1 px-3 py-2 rounded-lg border text-xs outline-none ${isDark ? 'bg-[#1a1a1a] text-white border-[#2e2e2e] placeholder-[#444]' : 'bg-white text-[#0a0a0a] border-[#e0e0e0] placeholder-[#bbb]'}`}
               />
               <button
@@ -811,28 +828,27 @@ Be concise, warm, and helpful. You protect both parties.`,
             </div>
           </div>
         )}
-        </div>
 
         {/* Scam warning */}
         {scamFlag && (
           <div className="mx-4 mb-3 flex items-start gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10">
-            <AlertTriangle size={13} className="text-red-500 mt-0.5 flex-shrink-0"/>
+            <AlertTriangle size={13} className="text-red-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-xs font-bold text-red-500">⚠️ Off-platform payment detected</p>
               <p className="text-xs text-red-400 mt-0.5">This removes your escrow protection. Please edit your message.</p>
             </div>
-            <button onClick={() => setScamFlag(false)}><X size={12} className="text-red-400"/></button>
+            <button onClick={() => setScamFlag(false)}><X size={12} className="text-red-400" /></button>
           </div>
         )}
 
         {/* Colle typing */}
         {aiLoading && (
           <div className="flex items-center gap-2 px-6 py-2">
-            <Bot size={12} className="text-green-500"/>
+            <Bot size={12} className="text-green-500" />
             <div className="flex gap-1">
-              {[0,1,2].map(i => (
+              {[0, 1, 2].map(i => (
                 <div key={i} className="w-1.5 h-1.5 rounded-full bg-green-500 animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }}/>
+                  style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
             <span className="text-xs text-green-500 font-medium">Colle is thinking...</span>
@@ -841,14 +857,14 @@ Be concise, warm, and helpful. You protect both parties.`,
 
         {/* Input */}
         <div className={`flex items-center gap-2 px-4 py-3 border-t ${c.border} flex-shrink-0 ${isDark ? 'bg-[#111]' : 'bg-white'}`}>
-          <input ref={fileRef} type="file" className="hidden" onChange={sendFile}/>
+          <input ref={fileRef} type="file" className="hidden" onChange={sendFile} />
           <button onClick={() => fileRef.current?.click()}
             className={`p-2.5 rounded-xl ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} ${c.light} flex-shrink-0`}>
-            <Paperclip size={15}/>
+            <Paperclip size={15} />
           </button>
           <button onClick={() => setInput('Colle')} title="Summon Colle"
             className="p-2.5 rounded-xl flex-shrink-0 bg-green-500/10 border border-green-500/20 text-green-500 hover:bg-green-500/20 transition-all">
-            <Bot size={15}/>
+            <Bot size={15} />
           </button>
           <input type="text"
             placeholder='Message... or type "Colle" for AI help'
@@ -858,11 +874,11 @@ Be concise, warm, and helpful. You protect both parties.`,
             className={`flex-1 px-4 py-2.5 rounded-xl border text-sm outline-none transition-all
               ${isDark
                 ? 'bg-[#1a1a1a] text-white placeholder-[#444] border-[#2e2e2e] focus:border-green-500/50'
-                : 'bg-[#f8f8f8] text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0] focus:border-[#0a0a0a]'}`}/>
+                : 'bg-[#f8f8f8] text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0] focus:border-[#0a0a0a]'}`} />
           <button onClick={sendMsg} disabled={!input.trim() || aiLoading}
             className={`p-2.5 rounded-xl flex-shrink-0 transition-all disabled:opacity-30
               ${isDark ? 'bg-white text-[#0a0a0a]' : 'bg-[#0a0a0a] text-white'}`}>
-            <Send size={15}/>
+            <Send size={15} />
           </button>
         </div>
       </div>
@@ -872,15 +888,15 @@ Be concise, warm, and helpful. You protect both parties.`,
         <div className={`w-72 flex-shrink-0 border-l ${c.border} flex flex-col ${isDark ? 'bg-[#111]' : 'bg-white'} overflow-hidden`}>
           <div className={`flex items-center justify-between px-4 py-3 border-b ${c.border}`}>
             <div className="flex items-center gap-2">
-              <FileText size={13} className={c.muted}/>
+              <FileText size={13} className={c.muted} />
               <p className={`text-xs font-bold ${c.text}`}>Contract & Milestones</p>
             </div>
             <button onClick={() => setShowPanel(false)} className={c.muted}>
-              <X size={14}/>
+              <X size={14} />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <ContractPanel chatId={chat.id} isDark={isDark} c={c}/>
+            <ContractPanel chatId={chat.id} isDark={isDark} c={c} />
           </div>
         </div>
       )}
@@ -890,9 +906,9 @@ Be concise, warm, and helpful. You protect both parties.`,
 
 // ── Notifications bell ─────────────────────────────────────
 function NotificationsBell({ userId, isDark, c }) {
-  const [notifs, setNotifs]     = useState([])
-  const [open, setOpen]         = useState(false)
-  const [unread, setUnread]     = useState(0)
+  const [notifs, setNotifs] = useState([])
+  const [open, setOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -982,7 +998,7 @@ function NotificationsBell({ userId, isDark, c }) {
           ${open
             ? 'border-green-500/30 bg-green-500/10 text-green-500'
             : `${c.border} ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} ${c.light}`}`}>
-        <Bell size={15}/>
+        <Bell size={15} />
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 text-white text-[9px] font-bold flex items-center justify-center">
             {unread > 9 ? '9+' : unread}
@@ -1037,24 +1053,24 @@ export default function Messages() {
   const [searchParams] = useSearchParams()
   const isDark = theme === 'dark'
 
-  const [chats, setChats]       = useState([])
-  const [jobs, setJobs]         = useState([])
+  const [chats, setChats] = useState([])
+  const [jobs, setJobs] = useState([])
   const [selected, setSelected] = useState(null)
   const [mobileView, setMobileView] = useState('list')
-  const [search, setSearch]     = useState('')
-  const [loading, setLoading]   = useState(true)
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
 
   const c = {
-    bg:      isDark ? 'bg-[#0a0a0a]'     : 'bg-[#f8f8f8]',
-    card:    isDark ? 'bg-[#111]'        : 'bg-white',
-    bgMid:   isDark ? 'bg-[#1a1a1a]'     : 'bg-[#f0f0f0]',
-    bgAcc:   isDark ? 'bg-[#242424]'     : 'bg-[#e8e8e8]',
-    border:  isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
-    text:    isDark ? 'text-white'       : 'text-[#0a0a0a]',
-    muted:   isDark ? 'text-[#555]'      : 'text-[#aaa]',
-    light:   isDark ? 'text-[#888]'      : 'text-[#666]',
-    divider: isDark ? 'bg-[#2e2e2e]'     : 'bg-[#e0e0e0]',
-    input:   isDark
+    bg: isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]',
+    card: isDark ? 'bg-[#111]' : 'bg-white',
+    bgMid: isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]',
+    bgAcc: isDark ? 'bg-[#242424]' : 'bg-[#e8e8e8]',
+    border: isDark ? 'border-[#2e2e2e]' : 'border-[#e0e0e0]',
+    text: isDark ? 'text-white' : 'text-[#0a0a0a]',
+    muted: isDark ? 'text-[#555]' : 'text-[#aaa]',
+    light: isDark ? 'text-[#888]' : 'text-[#666]',
+    divider: isDark ? 'bg-[#2e2e2e]' : 'bg-[#e0e0e0]',
+    input: isDark
       ? 'bg-[#1a1a1a] text-white placeholder-[#444] border-[#2e2e2e]'
       : 'bg-[#f8f8f8] text-[#0a0a0a] placeholder-[#bbb] border-[#e0e0e0]',
   }
@@ -1067,32 +1083,112 @@ export default function Messages() {
 
   useEffect(() => {
     const contractId = searchParams.get('contract')
-    const jobId      = searchParams.get('job')
-    const chatId     = searchParams.get('chat')
+    const jobId = searchParams.get('job')
+    const chatId = searchParams.get('chat')
 
     if (!contractId && !jobId && !chatId) return
-    if (chats.length === 0) return
 
+    // Try to find in already-loaded chats first
     let match = null
-    if (chatId)     match = chats.find(ch => ch.id === chatId)
+    if (chatId) match = chats.find(ch => ch.id === chatId)
     if (!match && contractId) match = chats.find(ch => ch.contract_id === contractId)
-    if (!match && jobId)      match = chats.find(ch => ch.job_id === jobId)
+    if (!match && jobId) match = chats.find(ch => ch.job_id === jobId)
 
     if (match) {
       setSelected(match)
       setMobileView('chat')
-    } else if (chatId || jobId) {
-      // Chat was just created — refetch after short delay and try again
-      setTimeout(() => {
-        fetchChats().then(() => {
-          // The effect will re-run when chats updates
-        })
-      }, 1000)
+      return
     }
-  }, [searchParams, chats])
+
+    // Not found in local state — fetch directly (handles race condition after Apply)
+    if (!user) return
+    const hydrateChatsWithUsers = async (rawChats) => {
+      if (!rawChats?.length) return []
+      const ids = Array.from(new Set(
+        rawChats.flatMap(ch => [ch.client_id, ch.freelancer_id]).filter(Boolean)
+      ))
+      if (ids.length === 0) return rawChats
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, trust_score')
+        .in('id', ids)
+      const userMap = new Map((usersData || []).map(u => [u.id, u]))
+      return rawChats.map(ch => ({
+        ...ch,
+        client: ch.client || userMap.get(ch.client_id) || null,
+        freelancer: ch.freelancer || userMap.get(ch.freelancer_id) || null,
+      }))
+    }
+
+    const fetchAndSelect = async () => {
+      let query = supabase
+        .from('chats')
+        .select(`
+          *,
+          client:users!chats_client_id_fkey(id, full_name, trust_score),
+          freelancer:users!chats_freelancer_id_fkey(id, full_name, trust_score),
+          contract:contracts(id, title, status, total_value),
+          job:jobs(id, title, budget_min, budget_max, description, brief_url, brief_name, client_id)
+        `)
+
+      if (chatId) query = query.eq('id', chatId)
+      else if (jobId) query = query.eq('job_id', jobId).eq('freelancer_id', user.id)
+      else if (contractId) query = query.eq('contract_id', contractId)
+
+      let { data, error } = await query.maybeSingle()
+
+      // Fallback: if joined query fails due schema drift/RLS on related tables, fetch base chat only
+      if (error) {
+        let baseQuery = supabase.from('chats').select('*')
+        if (chatId) baseQuery = baseQuery.eq('id', chatId)
+        else if (jobId) baseQuery = baseQuery.eq('job_id', jobId).eq('freelancer_id', user.id)
+        else if (contractId) baseQuery = baseQuery.eq('contract_id', contractId)
+        const { data: baseData } = await baseQuery.maybeSingle()
+        data = baseData
+      }
+
+      if (data) {
+        const [hydrated] = await hydrateChatsWithUsers([data])
+        const chatData = hydrated || data
+        const { data: lm } = await supabase
+          .from('messages')
+          .select('content, created_at, type')
+          .eq('chat_id', chatData.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const fullChat = { ...chatData, lastMessage: lm }
+        setChats(prev => prev.find(c => c.id === chatData.id) ? prev : [fullChat, ...prev])
+        setSelected(fullChat)
+        setMobileView('chat')
+      } else {
+        // Retry once after short delay for Supabase replication lag
+        setTimeout(fetchAndSelect, 1200)
+      }
+    }
+    fetchAndSelect()
+  }, [searchParams, chats.length, user])
 
   const fetchChats = async () => {
-    const { data } = await supabase
+    const hydrateChatsWithUsers = async (rawChats) => {
+      if (!rawChats?.length) return []
+      const ids = Array.from(new Set(
+        rawChats.flatMap(ch => [ch.client_id, ch.freelancer_id]).filter(Boolean)
+      ))
+      if (ids.length === 0) return rawChats
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, full_name, trust_score')
+        .in('id', ids)
+      const userMap = new Map((usersData || []).map(u => [u.id, u]))
+      return rawChats.map(ch => ({
+        ...ch,
+        client: ch.client || userMap.get(ch.client_id) || null,
+        freelancer: ch.freelancer || userMap.get(ch.freelancer_id) || null,
+      }))
+    }
+
+    let { data, error } = await supabase
       .from('chats')
       .select(`
         *,
@@ -1104,15 +1200,26 @@ export default function Messages() {
       .or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
 
+    // Fallback: if relation joins fail, still load chats so user can open conversation
+    if (error) {
+      const fallback = await supabase
+        .from('chats')
+        .select('*')
+        .or(`client_id.eq.${user.id},freelancer_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+      data = fallback.data || []
+    }
+
     if (data) {
-      const withLast = await Promise.all(data.map(async ch => {
+      const hydratedChats = await hydrateChatsWithUsers(data)
+      const withLast = await Promise.all(hydratedChats.map(async ch => {
         const { data: lm } = await supabase
           .from('messages')
           .select('content, created_at, type')
           .eq('chat_id', ch.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle()
         return { ...ch, lastMessage: lm }
       }))
       setChats(withLast)
@@ -1135,7 +1242,7 @@ export default function Messages() {
     const name = party?.full_name || ''
     const title = ch.contract?.title || ch.job?.title || ''
     return name.toLowerCase().includes(search.toLowerCase()) ||
-           title.toLowerCase().includes(search.toLowerCase())
+      title.toLowerCase().includes(search.toLowerCase())
   })
 
   return (
@@ -1145,17 +1252,17 @@ export default function Messages() {
       <header className={`flex items-center justify-between px-6 py-4 border-b ${c.border} ${c.card} flex-shrink-0`}>
         <div className="flex items-center gap-4">
           <Link to="/dashboard" className={`flex items-center gap-2 text-sm font-semibold ${c.light}`}>
-            <ArrowLeft size={15}/> Dashboard
+            <ArrowLeft size={15} /> Dashboard
           </Link>
-          <div className={`w-px h-4 ${c.divider}`}/>
+          <div className={`w-px h-4 ${c.divider}`} />
           <span className={`text-sm font-bold ${c.text}`}>Messages</span>
         </div>
         <div className="flex items-center gap-2">
           <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border ${c.border} text-xs font-bold ${c.muted}`}>
-            <Bot size={11} className="text-green-500"/> Colle Active
+            <Bot size={11} className="text-green-500" /> Colle Active
           </div>
           {/* Notifications bell */}
-          {user && <NotificationsBell userId={user.id} isDark={isDark} c={c}/>}
+          {user && <NotificationsBell userId={user.id} isDark={isDark} c={c} />}
           <button onClick={toggle}
             className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm
               ${isDark ? 'border-[#2e2e2e] bg-[#1a1a1a]' : 'border-[#e0e0e0] bg-[#f0f0f0]'}`}>
@@ -1175,7 +1282,7 @@ export default function Messages() {
             <div className={`border-b ${c.border} ${isDark ? 'bg-[#0a0a0a]' : 'bg-[#f8f8f8]'}`}>
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <Bell size={13} className="text-green-500"/>
+                  <Bell size={13} className="text-green-500" />
                   <span className={`text-xs font-bold ${c.text}`}>Job Alerts</span>
                   <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold">
                     {jobs.length}
@@ -1189,7 +1296,7 @@ export default function Messages() {
                     className={`flex items-center gap-3 p-3 rounded-xl border ${c.border} transition-all
                       ${isDark ? 'hover:bg-[#1a1a1a]' : 'hover:bg-white'} block`}>
                     <div className={`w-8 h-8 rounded-lg ${isDark ? 'bg-[#1a1a1a]' : 'bg-[#f0f0f0]'} border ${c.border} flex items-center justify-center flex-shrink-0`}>
-                      <Briefcase size={12} className={c.muted}/>
+                      <Briefcase size={12} className={c.muted} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-bold truncate ${c.text}`}>{job.title}</p>
@@ -1206,10 +1313,10 @@ export default function Messages() {
           {/* Search */}
           <div className={`px-4 py-3 border-b ${c.border}`}>
             <div className="relative">
-              <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${c.muted}`}/>
+              <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${c.muted}`} />
               <input type="text" placeholder="Search conversations..."
                 value={search} onChange={e => setSearch(e.target.value)}
-                className={`w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm outline-none ${c.input}`}/>
+                className={`w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm outline-none ${c.input}`} />
             </div>
           </div>
 
@@ -1217,12 +1324,12 @@ export default function Messages() {
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+                <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : filtered.length > 0 ? filtered.map(ch => {
               const party = user.id === ch.client_id ? ch.freelancer : ch.client
               const name = party?.full_name || 'Unknown'
-              const initials = name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+              const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
               const title = ch.contract?.title || ch.job?.title || 'Conversation'
               const lm = ch.lastMessage
 
@@ -1246,13 +1353,13 @@ export default function Messages() {
                       <p className={`text-xs truncate mt-1 ${c.light}`}>
                         {lm.type === 'colle' ? '🤖 Colle responded'
                           : lm.type === 'file' ? '📎 File shared'
-                          : lm.type === 'system' ? '🔔 ' + lm.content
-                          : lm.content}
+                            : lm.type === 'system' ? '🔔 ' + lm.content
+                              : lm.content}
                       </p>
                     )}
                     {ch.contract && (
                       <div className="flex items-center gap-1 mt-1.5">
-                        <Lock size={9} className="text-green-500"/>
+                        <Lock size={9} className="text-green-500" />
                         <span className="text-xs text-green-500 font-medium">
                           ₦{ch.contract.total_value?.toLocaleString()} escrow
                         </span>
@@ -1271,7 +1378,7 @@ export default function Messages() {
                 <Link to={isFreelancer ? '/jobs' : '/contracts/new'}
                   className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all
                     ${isDark ? 'bg-white text-[#0a0a0a]' : 'bg-[#0a0a0a] text-white'}`}>
-                  <Plus size={12}/>
+                  <Plus size={12} />
                   {isFreelancer ? 'Find Jobs' : 'New Contract'}
                 </Link>
               </div>
@@ -1293,7 +1400,7 @@ export default function Messages() {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-8">
               <div className={`w-16 h-16 rounded-2xl ${c.card} border ${c.border} flex items-center justify-center`}>
-                <Bot size={28} className="text-green-500"/>
+                <Bot size={28} className="text-green-500" />
               </div>
               <div>
                 <p className={`font-bold ${c.text}`}>Select a conversation</p>

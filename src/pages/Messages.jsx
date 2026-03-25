@@ -495,7 +495,7 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
         // User wants to edit an existing contract draft
         const currentContract = existingDraft.metadata?.contract
 
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch('/api/colle', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -555,7 +555,7 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
         }
       } else if (wantsDraft) {
         // Ask Colle to return structured contract JSON
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch('/api/colle', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -607,7 +607,7 @@ Return ONLY the JSON. No other text.`,
         }
       } else {
         // Regular Colle response
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch('/api/colle', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

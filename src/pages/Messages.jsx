@@ -526,7 +526,7 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
         const currentContract = existingDraft.metadata?.contract
 
         const data = await callColleModel({
-          model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+          model: 'gemini-1.5-flash', max_tokens: 2000,
           system: `You are Colle, the AI contract assistant for Collectica. The user wants to edit an existing contract draft. Apply their requested changes and return the COMPLETE updated contract as valid JSON only, with this exact structure:
 {
   "title": "contract title",
@@ -581,7 +581,7 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
       } else if (wantsDraft) {
         // Ask Colle to return structured contract JSON
         const data = await callColleModel({
-          model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+          model: 'gemini-1.5-flash', max_tokens: 2000,
           system: `You are Colle, the AI legal assistant for Collectica. Extract a fair contract from the conversation. Return ONLY valid JSON:
 {
   "title": "descriptive contract title",
@@ -628,7 +628,7 @@ Return ONLY the JSON. No other text.`,
       } else {
         // Regular Colle response
         const data = await callColleModel({
-          model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+          model: 'gemini-1.5-flash', max_tokens: 1000,
           system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. 
 
 When they're ready: tell them to type "Colle draft contract" to generate a signable contract from this conversation.

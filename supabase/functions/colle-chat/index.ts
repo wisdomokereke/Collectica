@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 
 const corsHeaders = {
@@ -11,10 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+    const apiKey = Deno.env.get('GEMINI_API_KEY')
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'Missing ANTHROPIC_API_KEY in Edge Function secrets.' }),
+        JSON.stringify({ error: 'Missing GEMINI_API_KEY in Edge Function secrets.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -22,26 +23,48 @@ serve(async (req) => {
     const body = await req.json()
     const { model, max_tokens, system, messages } = body || {}
 
-    if (!model || !max_tokens || !system || !Array.isArray(messages)) {
+    if (!model || !system || !Array.isArray(messages)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid payload. Expected model, max_tokens, system, messages[]' }),
+        JSON.stringify({ error: 'Invalid payload. Expected model, system, messages[]' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // Map Claude-style incoming messages to Gemini format
+    const geminiContents = messages.map((m: any) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }))
+
+    const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+    const res = await fetch(fetchUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({ model, max_tokens, system, messages }),
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: system }]
+        },
+        contents: geminiContents,
+        generationConfig: {
+          maxOutputTokens: max_tokens || 2000,
+        }
+      }),
     })
 
-    const text = await res.text()
-    return new Response(text, {
-      status: res.status,
+    const data = await res.json()
+
+    if (!res.ok) {
+      throw new Error(data.error?.message || 'Error from Gemini API')
+    }
+
+    // Safely extract text from Gemini response structure and match the old Claude format.
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    return new Response(JSON.stringify({ content: [{ text }] }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {

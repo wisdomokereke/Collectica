@@ -491,7 +491,7 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
   const callColle = async (userMessage) => {
     setAiLoading(true); setColleActive(true)
     await insertMessage({
-      chat_id: chat.id, sender_id: 'system',
+      chat_id: chat.id, sender_id: null,
       content: `${displayName} summoned Colle...`, type: 'system',
     })
 
@@ -519,13 +519,9 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
     const prompt = `${userMessage.length > 6 ? `The user said: "${userMessage}"\n\n` : ''}${jobContext ? `Job Context:${jobContext}\n\n` : ''}Conversation:\n${history || 'No messages yet.'}`
 
     const callColleModel = async (payload) => {
-      const res = await fetch('/api/colle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch from /api/colle')
+      const { data, error } = await supabase.functions.invoke('colle-chat', { body: payload })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
       return data
     }
 
@@ -560,7 +556,7 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
           // Insert NEW contract_draft (updated version)
           await insertMessage({
             chat_id: chat.id,
-            sender_id: 'colle',
+            sender_id: null,
             content: `✏️ Contract updated: ${updatedContract.summary}`,
             type: 'contract_draft',
             metadata: {
@@ -576,13 +572,13 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
           // Colle explains the change
           await insertMessage({
             chat_id: chat.id,
-            sender_id: 'colle',
+            sender_id: null,
             content: `I've updated the contract above. ${updatedContract.summary}\n\nReview the new version and sign when you're both happy with it.`,
             type: 'colle',
           })
         } catch {
           await insertMessage({
-            chat_id: chat.id, sender_id: 'colle',
+            chat_id: chat.id, sender_id: null,
             content: `I couldn't parse that edit. Try being more specific, like: "Colle change the budget to ₦200,000" or "Colle add a milestone for final delivery".`,
             type: 'colle',
           })
@@ -617,7 +613,7 @@ Return ONLY the JSON. No other text.`,
           // Insert as contract_draft message type with metadata
           await insertMessage({
             chat_id: chat.id,
-            sender_id: 'colle',
+            sender_id: null,
             content: contractData.summary || 'Contract draft ready for review.',
             type: 'contract_draft',
             metadata: {
@@ -631,7 +627,7 @@ Return ONLY the JSON. No other text.`,
         } catch {
           // Fallback to regular Colle message if JSON parse fails
           await insertMessage({
-            chat_id: chat.id, sender_id: 'colle', content: raw, type: 'colle',
+            chat_id: chat.id, sender_id: null, content: raw, type: 'colle',
           })
         }
       } else {
@@ -648,13 +644,14 @@ Be concise, warm, and helpful. You protect both parties.`,
         })
         const text = data.content?.[0]?.text || 'I could not process that. Please try again.'
         await insertMessage({
-          chat_id: chat.id, sender_id: 'colle', content: text, type: 'colle',
+          chat_id: chat.id, sender_id: null, content: text, type: 'colle',
         })
       }
-    } catch {
+    } catch (err) {
+      console.error("Colle error:", err);
       await insertMessage({
-        chat_id: chat.id, sender_id: 'colle',
-        content: 'Having trouble connecting right now. Please try again.',
+        chat_id: chat.id, sender_id: null,
+        content: `Having trouble connecting right now. Please try again.`,
         type: 'colle',
       })
     } finally { setAiLoading(false) }
@@ -731,7 +728,7 @@ Be concise, warm, and helpful. You protect both parties.`,
 
         // Colle announces and asks for escrow funding
         await insertMessage({
-          chat_id: chat.id, sender_id: 'colle',
+          chat_id: chat.id, sender_id: null,
           content: `✅ Both parties have signed! The contract "${ct.title}" is now active.\n\n💰 Next step: ${chat.client?.full_name || 'Client'}, please fund the escrow from your wallet so the freelancer can begin work. Go to Wallet → Fund Contract.`,
           type: 'colle',
         })
@@ -740,7 +737,7 @@ Be concise, warm, and helpful. You protect both parties.`,
       // One party signed — notify
       const who = isClient ? 'Client' : 'Freelancer'
       await insertMessage({
-        chat_id: chat.id, sender_id: 'system',
+        chat_id: chat.id, sender_id: null,
         content: `✍️ ${who} has signed. Waiting for the ${isClient ? 'freelancer' : 'client'} to sign before the contract is activated.`,
         type: 'system',
       })

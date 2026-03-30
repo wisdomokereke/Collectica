@@ -519,9 +519,13 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
     const prompt = `${userMessage.length > 6 ? `The user said: "${userMessage}"\n\n` : ''}${jobContext ? `Job Context:${jobContext}\n\n` : ''}Conversation:\n${history || 'No messages yet.'}`
 
     const callColleModel = async (payload) => {
-      const { data, error } = await supabase.functions.invoke('colle-chat', { body: payload })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
+      const res = await fetch('/api/colle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch from /api/colle')
       return data
     }
 

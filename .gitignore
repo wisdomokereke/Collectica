@@ -11,3 +11,6 @@ dist
 # Build logs
 build_out.txt
 build_output.log
+
+# Supabase temp directories
+supabase/.temp/

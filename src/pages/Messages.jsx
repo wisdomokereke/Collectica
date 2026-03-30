@@ -454,6 +454,11 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
     setLoading(false)
   }
 
+  const insertMessage = async (msgData) => {
+    const { error } = await supabase.from('messages').insert(msgData)
+    if (error) console.error('Message insert error:', error)
+  }
+
   const sendMsg = async () => {
     const text = input.trim()
     if (!text) return
@@ -464,7 +469,7 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
       setInput(''); callColle(text); return
     }
     setInput(''); setScamFlag(false)
-    await supabase.from('messages').insert({
+    await insertMessage({
       chat_id: chat.id, sender_id: myId, content: text, type: 'text',
     })
   }
@@ -474,7 +479,7 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
     const path = `${chat.id}/${Date.now()}-${file.name}`
     const { error } = await supabase.storage.from('deliverables').upload(path, file)
     const { data: urlData } = supabase.storage.from('deliverables').getPublicUrl(path)
-    await supabase.from('messages').insert({
+    await insertMessage({
       chat_id: chat.id, sender_id: myId,
       content: file.name,
       file_url: !error ? urlData.publicUrl : null,
@@ -485,8 +490,8 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
 
   const callColle = async (userMessage) => {
     setAiLoading(true); setColleActive(true)
-    await supabase.from('messages').insert({
-      chat_id: chat.id, sender_id: null,
+    await insertMessage({
+      chat_id: chat.id, sender_id: 'system',
       content: `${displayName} summoned Colle...`, type: 'system',
     })
 
@@ -549,9 +554,9 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
           const updatedContract = JSON.parse(raw.replace(/```json|```/g, '').trim())
 
           // Insert NEW contract_draft (updated version)
-          await supabase.from('messages').insert({
+          await insertMessage({
             chat_id: chat.id,
-            sender_id: null,
+            sender_id: 'colle',
             content: `✏️ Contract updated: ${updatedContract.summary}`,
             type: 'contract_draft',
             metadata: {
@@ -565,15 +570,15 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
           })
 
           // Colle explains the change
-          await supabase.from('messages').insert({
+          await insertMessage({
             chat_id: chat.id,
-            sender_id: null,
+            sender_id: 'colle',
             content: `I've updated the contract above. ${updatedContract.summary}\n\nReview the new version and sign when you're both happy with it.`,
             type: 'colle',
           })
         } catch {
-          await supabase.from('messages').insert({
-            chat_id: chat.id, sender_id: null,
+          await insertMessage({
+            chat_id: chat.id, sender_id: 'colle',
             content: `I couldn't parse that edit. Try being more specific, like: "Colle change the budget to ₦200,000" or "Colle add a milestone for final delivery".`,
             type: 'colle',
           })
@@ -606,9 +611,9 @@ Return ONLY the JSON. No other text.`,
         try {
           const contractData = JSON.parse(raw.replace(/```json|```/g, '').trim())
           // Insert as contract_draft message type with metadata
-          await supabase.from('messages').insert({
+          await insertMessage({
             chat_id: chat.id,
-            sender_id: null,
+            sender_id: 'colle',
             content: contractData.summary || 'Contract draft ready for review.',
             type: 'contract_draft',
             metadata: {
@@ -621,8 +626,8 @@ Return ONLY the JSON. No other text.`,
           })
         } catch {
           // Fallback to regular Colle message if JSON parse fails
-          await supabase.from('messages').insert({
-            chat_id: chat.id, sender_id: null, content: raw, type: 'colle',
+          await insertMessage({
+            chat_id: chat.id, sender_id: 'colle', content: raw, type: 'colle',
           })
         }
       } else {
@@ -638,13 +643,13 @@ Be concise, warm, and helpful. You protect both parties.`,
           messages: [{ role: 'user', content: prompt }]
         })
         const text = data.content?.[0]?.text || 'I could not process that. Please try again.'
-        await supabase.from('messages').insert({
-          chat_id: chat.id, sender_id: null, content: text, type: 'colle',
+        await insertMessage({
+          chat_id: chat.id, sender_id: 'colle', content: text, type: 'colle',
         })
       }
     } catch {
-      await supabase.from('messages').insert({
-        chat_id: chat.id, sender_id: null,
+      await insertMessage({
+        chat_id: chat.id, sender_id: 'colle',
         content: 'Having trouble connecting right now. Please try again.',
         type: 'colle',
       })
@@ -721,8 +726,8 @@ Be concise, warm, and helpful. You protect both parties.`,
           .eq('id', chat.id)
 
         // Colle announces and asks for escrow funding
-        await supabase.from('messages').insert({
-          chat_id: chat.id, sender_id: null,
+        await insertMessage({
+          chat_id: chat.id, sender_id: 'colle',
           content: `✅ Both parties have signed! The contract "${ct.title}" is now active.\n\n💰 Next step: ${chat.client?.full_name || 'Client'}, please fund the escrow from your wallet so the freelancer can begin work. Go to Wallet → Fund Contract.`,
           type: 'colle',
         })
@@ -730,8 +735,8 @@ Be concise, warm, and helpful. You protect both parties.`,
     } else {
       // One party signed — notify
       const who = isClient ? 'Client' : 'Freelancer'
-      await supabase.from('messages').insert({
-        chat_id: chat.id, sender_id: null,
+      await insertMessage({
+        chat_id: chat.id, sender_id: 'system',
         content: `✍️ ${who} has signed. Waiting for the ${isClient ? 'freelancer' : 'client'} to sign before the contract is activated.`,
         type: 'system',
       })

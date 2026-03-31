@@ -513,21 +513,18 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
 
     const prompt = `${userMessage.length > 6 ? `The user said: "${userMessage}"\n\n` : ''}${jobContext ? `Job Context:${jobContext}\n\n` : ''}Conversation:\n${history || 'No messages yet.'}`
 
-    const callColleModel = async (payload) => {
-      const { data, error } = await supabase.functions.invoke('colle-chat', { body: payload })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-      return data
-    }
-
     try {
       if (wantsEdit && existingDraft) {
         // User wants to edit an existing contract draft
         const currentContract = existingDraft.metadata?.contract
 
-        const data = await callColleModel({
-          model: 'gemini-1.5-flash', max_tokens: 2000,
-          system: `You are Colle, the AI contract assistant for Collectica. The user wants to edit an existing contract draft. Apply their requested changes and return the COMPLETE updated contract as valid JSON only, with this exact structure:
+        const res = await fetch('/api/colle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-1.5-flash',
+            max_tokens: 2000,
+            system: `You are Colle, the AI contract assistant for Collectica. The user wants to edit an existing contract draft. Apply their requested changes and return the COMPLETE updated contract as valid JSON only, with this exact structure:
 {
   "title": "contract title",
   "scope": "full scope description",
@@ -539,12 +536,15 @@ function ChatView({ chat, isDark, c, onBack, myId, displayName }) {
   "summary": "one sentence summary of what changed"
 }
 Return ONLY the JSON. Apply the user's edit faithfully.`,
-          messages: [{
-            role: 'user',
-            content: `Current contract:\n${JSON.stringify(currentContract, null, 2)}\n\nUser's edit request: "${userMessage}"\n\nReturn the updated contract JSON.`
-          }]
+            messages: [{
+              role: 'user',
+              content: `Current contract:\n${JSON.stringify(currentContract, null, 2)}\n\nUser's edit request: "${userMessage}"\n\nReturn the updated contract JSON.`
+            }]
+          })
         })
+        const data = await res.json()
         const raw = data.content?.[0]?.text || ''
+        
         try {
           const updatedContract = JSON.parse(raw.replace(/```json|```/g, '').trim())
 
@@ -580,9 +580,13 @@ Return ONLY the JSON. Apply the user's edit faithfully.`,
         }
       } else if (wantsDraft) {
         // Ask Colle to return structured contract JSON
-        const data = await callColleModel({
-          model: 'gemini-1.5-flash', max_tokens: 2000,
-          system: `You are Colle, the AI legal assistant for Collectica. Extract a fair contract from the conversation. Return ONLY valid JSON:
+        const res = await fetch('/api/colle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-1.5-flash',
+            max_tokens: 2000,
+            system: `You are Colle, the AI legal assistant for Collectica. Extract a fair contract from the conversation. Return ONLY valid JSON:
 {
   "title": "descriptive contract title",
   "scope": "detailed scope of work — be specific about deliverables",
@@ -600,9 +604,12 @@ Rules:
 - if a brief is attached, use its details
 - if no explicit price agreed, use the middle of the job budget range
 Return ONLY the JSON. No other text.`,
-          messages: [{ role: 'user', content: prompt }]
+            messages: [{ role: 'user', content: prompt }]
+          })
         })
+        const data = await res.json()
         const raw = data.content?.[0]?.text || ''
+        
         try {
           const contractData = JSON.parse(raw.replace(/```json|```/g, '').trim())
           // Insert as contract_draft message type with metadata
@@ -627,17 +634,24 @@ Return ONLY the JSON. No other text.`,
         }
       } else {
         // Regular Colle response
-        const data = await callColleModel({
-          model: 'gemini-1.5-flash', max_tokens: 1000,
-          system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. 
+        const res = await fetch('/api/colle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-1.5-flash',
+            max_tokens: 1000,
+            system: `You are Colle, the AI legal assistant in Collectica — a contract-first freelance platform for Africa. Help the client and freelancer discuss scope, terms, and milestones. 
 
 When they're ready: tell them to type "Colle draft contract" to generate a signable contract from this conversation.
 After drafting: they can say things like "Colle change the budget to ₦200,000" or "Colle add a milestone for testing" to edit it.
 
 Be concise, warm, and helpful. You protect both parties.`,
-          messages: [{ role: 'user', content: prompt }]
+            messages: [{ role: 'user', content: prompt }]
+          })
         })
+        const data = await res.json()
         const text = data.content?.[0]?.text || 'I could not process that. Please try again.'
+        
         await supabase.from('messages').insert({
           chat_id: chat.id, sender_id: null, content: text, type: 'colle',
         })
